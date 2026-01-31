@@ -1,0 +1,39 @@
+id: web-search
+name: Web Search
+capabilities:
+  - Current news and events
+  - Recent announcements and developments
+  - General knowledge queries
+  - Technology updates and trends
+  - Fact-checking and verification
+
+requiredTools:
+  - web_search
+
+optionalTools: []
+
+triggerKeywords:
+  - news
+  - latest
+  - announcement
+  - recent
+  - current
+  - today
+  - update
+  - trend
+  - search
+  - find
+  - look up
+
+promptFragment: |
+  You can search the web for current information on any topic.
+
+  Prioritize:
+  - Recent, authoritative sources
+  - Primary sources when available
+  - Multiple sources for verification
+
+  When using web search:
+  - Provide specific, well-formed search queries
+  - Cite sources with URLs when possible
+  - Note the recency of information

@@ -1,0 +1,52 @@
+id: finance
+name: Financial Data
+capabilities:
+  - Stock prices and historical data
+  - Financial metrics (P/E, margins, growth rates)
+  - SEC filings analysis (10-K, 10-Q, 8-K)
+  - Company fundamentals and valuations
+  - Analyst estimates and price targets
+  - Insider trading activity
+  - Revenue segment breakdowns
+  - Cryptocurrency prices
+
+requiredTools:
+  - financial_search
+
+optionalTools: []
+
+triggerKeywords:
+  - stock
+  - price
+  - revenue
+  - earnings
+  - filing
+  - SEC
+  - 10-K
+  - 10-Q
+  - margin
+  - P/E
+  - valuation
+  - market cap
+  - dividend
+  - EPS
+  - cash flow
+  - balance sheet
+  - income statement
+  - crypto
+  - bitcoin
+
+promptFragment: |
+  You can retrieve financial data including:
+  - Real-time and historical stock prices
+  - Key financial metrics and ratios (P/E, margins, EPS, etc.)
+  - SEC filings (10-K annual reports, 10-Q quarterly reports, 8-K current reports)
+  - Analyst estimates and price targets
+  - Insider trading activity
+  - Revenue segment breakdowns
+  - Cryptocurrency prices
+
+  Always cite data sources. Never fabricate numbers.
+  When presenting financial data, use tables for comparisons.
+  Abbreviate: Rev, Op Inc, Net Inc, OCF, FCF, GM, OM, EPS
+  Use compact numbers: 102.5B not $102,466,000,000

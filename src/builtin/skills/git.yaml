@@ -1,0 +1,48 @@
+id: git
+name: Git Operations
+capabilities:
+  - Check repository status (modified, staged, untracked files)
+  - View commit history with author, date, and messages
+  - Show diffs between commits or working tree
+  - List, create, and delete branches
+  - Search git history for commits or patterns
+  - View staged vs unstaged changes
+
+requiredTools:
+  - git_status
+  - git_log
+  - git_diff
+  - git_branch
+  - git_search
+
+optionalTools: []
+
+triggerKeywords:
+  - git
+  - commit
+  - branch
+  - status
+  - diff
+  - log
+  - checkout
+  - merge
+  - rebase
+  - push
+  - pull
+  - staged
+  - modified
+  - untracked
+  - repository
+  - repo
+
+promptFragment: |
+  You can help with Git operations:
+  - Check status: modified files, staged changes, untracked files
+  - View commit history with author, date, and messages
+  - Show diffs between commits or working tree
+  - List, create, and delete branches
+  - Search commit history for patterns
+
+  Always show clear, concise output. Use tables for multiple commits.
+  Abbreviate: WIP (work in progress), stg (staged), mod (modified)
+  Use colors or markers: M (modified), A (added), D (deleted), ?? (untracked)
