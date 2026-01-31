@@ -96,6 +96,50 @@ skills:
       Note the publication date of sources.
 
 model:
-  primary: gpt-5.2
+  primary: gpt-4o
   provider: openai
   maxIterations: 10
+
+# Workflow configuration - loose style, trust the agent
+workflow:
+  style: loose
+  maxIterations: 10
+  timeoutMs: 60000
+  # Quality thinking encouragement (not restrictive)
+  thinking:
+    reflectionBeforeTool: true
+    reflectionBeforeAnswer: true
+    qualityPrompts:
+      - "What specific data supports this conclusion?"
+      - "What assumptions am I making?"
+      - "What might I be missing or overlooking?"
+      - "Is this appropriately caveated?"
+
+# Guardrails - encourage quality, don't block
+guardrails:
+  # Thinking quality (encouraged, not enforced)
+  thinking:
+    reflectionBeforeTool: true
+    reflectionBeforeAnswer: true
+    qualityChecklist:
+      - "Cite specific data points with dates"
+      - "Acknowledge what you don't know"
+      - "Consider alternative interpretations"
+      - "Distinguish correlation from causation"
+  
+  # Output standards (guidance, not rules)
+  output:
+    must:
+      - citeSources
+      - useTablesForComparisons
+      - acknowledgeLimitations
+    should:
+      - provideContext
+      - suggestNextSteps
+      - includeRelevantDates
+  
+  # Safety (soft blocks - warn, don't break)
+  safety:
+    blockFinancialAdvice: warn
+    blockFabricatedData: strict
+    blockUnsubstantiatedClaims: warn

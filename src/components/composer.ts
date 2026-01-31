@@ -209,16 +209,42 @@ export interface ComposedAgentSpec {
   model: string;
   provider: string;
   maxIterations: number;
+  workflow?: {
+    style: 'loose' | 'guided' | 'strict';
+    maxIterations: number;
+    timeoutMs: number;
+    thinking: {
+      reflectionBeforeTool: boolean;
+      reflectionBeforeAnswer: boolean;
+      qualityPrompts: string[];
+    };
+  };
+  guardrails?: {
+    thinking: {
+      reflectionBeforeTool: boolean;
+      reflectionBeforeAnswer: boolean;
+      qualityChecklist: string[];
+    };
+    output: {
+      must: string[];
+      should: string[];
+    };
+    safety: {
+      blockFinancialAdvice: 'warn' | 'strict' | 'off';
+      blockFabricatedData: 'warn' | 'strict' | 'off';
+      blockUnsubstantiatedClaims: 'warn' | 'strict' | 'off';
+    };
+  };
 }
 
 /**
  * Compose an agent from an AgentComposition
  */
 export function composeAgent(composition: AgentComposition): ComposedAgentSpec {
-  const { name, persona, skills, model } = composition;
+  const { name, persona, skills, model, workflow, guardrails } = composition;
 
   // Use defaults if model config not provided
-  const modelConfig = model ?? { primary: 'gpt-5.2', provider: 'openai', maxIterations: 10 };
+  const modelConfig = model ?? { primary: 'gpt-4o', provider: 'openai', maxIterations: 10 };
 
   // Bind tools based on skill requirements
   const { tools, registeredTools, missingTools } = bindTools(skills);
@@ -244,9 +270,35 @@ export function composeAgent(composition: AgentComposition): ComposedAgentSpec {
     tools,
     toolMap,
     registeredTools,
-    model: modelConfig.primary ?? 'gpt-5.2',
+    model: modelConfig.primary ?? 'gpt-4o',
     provider: modelConfig.provider ?? 'openai',
     maxIterations: modelConfig.maxIterations ?? 10,
+    workflow: workflow ? {
+      style: workflow.style ?? 'loose',
+      maxIterations: workflow.maxIterations ?? 10,
+      timeoutMs: workflow.timeoutMs ?? 60000,
+      thinking: {
+        reflectionBeforeTool: workflow.thinking?.reflectionBeforeTool ?? false,
+        reflectionBeforeAnswer: workflow.thinking?.reflectionBeforeAnswer ?? false,
+        qualityPrompts: workflow.thinking?.qualityPrompts ?? [],
+      },
+    } : undefined,
+    guardrails: guardrails ? {
+      thinking: {
+        reflectionBeforeTool: guardrails.thinking?.reflectionBeforeTool ?? false,
+        reflectionBeforeAnswer: guardrails.thinking?.reflectionBeforeAnswer ?? false,
+        qualityChecklist: guardrails.thinking?.qualityChecklist ?? [],
+      },
+      output: {
+        must: guardrails.output?.must ?? [],
+        should: guardrails.output?.should ?? [],
+      },
+      safety: {
+        blockFinancialAdvice: guardrails.safety?.blockFinancialAdvice ?? 'warn',
+        blockFabricatedData: guardrails.safety?.blockFabricatedData ?? 'strict',
+        blockUnsubstantiatedClaims: guardrails.safety?.blockUnsubstantiatedClaims ?? 'warn',
+      },
+    } : undefined,
   };
 }
 
@@ -284,7 +336,7 @@ export function quickCompose(
     persona,
     skills,
     model: {
-      primary: 'gpt-5.2',
+      primary: 'gpt-4o',
       provider: 'openai',
       maxIterations: 10,
     },

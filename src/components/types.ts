@@ -64,12 +64,54 @@ export type Skill = z.infer<typeof SkillSchema>;
 // ============================================================================
 
 export const ModelConfigSchema = z.object({
-  primary: z.string().default('gpt-5.2'),
+  primary: z.string().default('gpt-4o'),
   provider: z.string().default('openai'),
   maxIterations: z.number().default(10),
 });
 
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
+
+// ============================================================================
+// Workflow Configuration
+// ============================================================================
+
+export const WorkflowStyleSchema = z.enum(['loose', 'guided', 'strict']).default('loose');
+
+export const WorkflowConfigSchema = z.object({
+  style: WorkflowStyleSchema.default('loose'),
+  maxIterations: z.number().default(10),
+  timeoutMs: z.number().default(60000),
+  thinking: z.object({
+    reflectionBeforeTool: z.boolean().default(false),
+    reflectionBeforeAnswer: z.boolean().default(false),
+    qualityPrompts: z.array(z.string()).default([]),
+  }).optional(),
+});
+
+export type WorkflowConfig = z.infer<typeof WorkflowConfigSchema>;
+
+// ============================================================================
+// Guardrails Configuration
+// ============================================================================
+
+export const GuardrailsConfigSchema = z.object({
+  thinking: z.object({
+    reflectionBeforeTool: z.boolean().default(false),
+    reflectionBeforeAnswer: z.boolean().default(false),
+    qualityChecklist: z.array(z.string()).default([]),
+  }).optional(),
+  output: z.object({
+    must: z.array(z.string()).default([]),
+    should: z.array(z.string()).default([]),
+  }).optional(),
+  safety: z.object({
+    blockFinancialAdvice: z.enum(['warn', 'strict', 'off']).default('warn'),
+    blockFabricatedData: z.enum(['warn', 'strict', 'off']).default('strict'),
+    blockUnsubstantiatedClaims: z.enum(['warn', 'strict', 'off']).default('warn'),
+  }).optional(),
+});
+
+export type GuardrailsConfig = z.infer<typeof GuardrailsConfigSchema>;
 
 // ============================================================================
 // Agent Composition (Portable YAML Format)
@@ -91,6 +133,12 @@ export const AgentCompositionSchema = z.object({
 
   // Model configuration
   model: ModelConfigSchema.optional(),
+
+  // Workflow configuration
+  workflow: WorkflowConfigSchema.optional(),
+
+  // Guardrails configuration
+  guardrails: GuardrailsConfigSchema.optional(),
 });
 
 export type AgentComposition = z.infer<typeof AgentCompositionSchema>;

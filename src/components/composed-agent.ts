@@ -58,25 +58,41 @@ function getToolDescription(toolName: string, args: Record<string, unknown>): st
 /**
  * Build user prompt for agent iteration with tool summaries
  */
-function buildIterationPrompt(originalQuery: string, toolSummaries: string[]): string {
+function buildIterationPrompt(
+  originalQuery: string,
+  toolSummaries: string[],
+  qualityPrompts: string[]
+): string {
+  const qualitySection = qualityPrompts.length > 0
+    ? `\n\nQuality reflection before responding:\n${qualityPrompts.map(p => `- ${p}`).join('\n')}`
+    : '';
+
   return `Query: ${originalQuery}
 
 Data retrieved and work completed so far:
 ${toolSummaries.join('\n')}
 
-Review the data above. If you have sufficient information to answer the query, respond directly WITHOUT calling any tools. Only call additional tools if there are specific data gaps that prevent you from answering.`;
+Review the data above. If you have sufficient information to answer the query, respond directly WITHOUT calling any tools. Only call additional tools if there are specific data gaps that prevent you from answering.${qualitySection}`;
 }
 
 /**
  * Build the prompt for final answer generation with full context data
  */
-function buildFinalAnswerPrompt(originalQuery: string, fullContextData: string): string {
+function buildFinalAnswerPrompt(
+  originalQuery: string,
+  fullContextData: string,
+  qualityChecklist: string[]
+): string {
+  const qualitySection = qualityChecklist.length > 0
+    ? `\n\nBefore finalizing your answer, ensure:\n${qualityChecklist.map(c => `- ${c}`).join('\n')}`
+    : '';
+
   return `Query: ${originalQuery}
 
 Data retrieved from your tool calls:
 ${fullContextData}
 
-Answer the user's query using this data. Do not ask the user to provide additional data, paste values, or reference JSON/API internals. If data is incomplete, answer with what you have.`;
+Answer the user's query using this data. Do not ask the user to provide additional data, paste values, or reference JSON/API internals. If data is incomplete, answer with what you have.${qualitySection}`;
 }
 
 /**
@@ -164,7 +180,8 @@ export class ComposedAgent {
 
         // Generate final answer with full context from scratchpad
         const fullContext = this.buildFullContextForAnswer(scratchpad);
-        const finalPrompt = buildFinalAnswerPrompt(query, fullContext);
+        const qualityChecklist = this.spec.guardrails?.thinking.qualityChecklist ?? [];
+        const finalPrompt = buildFinalAnswerPrompt(query, fullContext, qualityChecklist);
 
         yield { type: 'answer_start' };
         const finalResponse = await this.callModel(finalPrompt, false);
@@ -191,12 +208,14 @@ export class ComposedAgent {
       }
 
       // Build iteration prompt from scratchpad
-      currentPrompt = buildIterationPrompt(query, scratchpad.getToolSummaries());
+      const qualityPrompts = this.spec.workflow?.thinking.qualityPrompts ?? [];
+      currentPrompt = buildIterationPrompt(query, scratchpad.getToolSummaries(), qualityPrompts);
     }
 
     // Max iterations reached - still generate proper final answer
     const fullContext = this.buildFullContextForAnswer(scratchpad);
-    const finalPrompt = buildFinalAnswerPrompt(query, fullContext);
+    const qualityChecklist = this.spec.guardrails?.thinking.qualityChecklist ?? [];
+    const finalPrompt = buildFinalAnswerPrompt(query, fullContext, qualityChecklist);
 
     yield { type: 'answer_start' };
     const finalResponse = await this.callModel(finalPrompt, false);
