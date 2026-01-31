@@ -9,7 +9,7 @@ import {
   listSkills,
   resolvePath,
 } from '../components/registry.js';
-import { composeAgent, quickCompose, ComposedAgentSpec } from '../components/composer.js';
+import { composeAgent, quickCompose, type ComposedAgentSpec } from '../components/composer.js';
 import { ComposedAgent } from '../components/composed-agent.js';
 import { globalToolRegistry } from '../runtime/tools.js';
 
@@ -31,9 +31,8 @@ function getConfiguredModels(): ModelInfo[] {
 
   if (process.env.OPENAI_API_KEY) {
     const baseUrl = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
-    console.log(`  OpenAI-compatible: ${baseUrl}`);
     if (baseUrl.includes('openrouter')) {
-      console.log('    → Using OpenRouter');
+      // Using OpenRouter
     }
     models.push({ provider: 'openai', model: process.env.DEFAULT_MODEL_ID || 'gpt-4o-mini', baseUrl });
   }
@@ -41,22 +40,22 @@ function getConfiguredModels(): ModelInfo[] {
   if (process.env.ANTHROPIC_API_KEY) {
     const baseUrl = process.env.ANTHROPIC_BASE_URL;
     console.log(`  Anthropic: ${baseUrl || 'default'}`);
-    models.push({ provider: 'anthropic', model: 'claude-sonnet-4-5-20250929', baseUrl });
+    models.push({ provider: 'anthropic', model: 'claude-sonnet-4-20250514', baseUrl });
   }
 
   if (process.env.GOOGLE_API_KEY) {
     console.log('  Google: default');
-    models.push({ provider: 'google', model: 'gemini-3-pro-preview' });
+    models.push({ provider: 'google', model: 'gemini-2.5-pro' });
   }
 
   if (process.env.XAI_API_KEY) {
     console.log('  xAI: https://api.x.ai/v1');
-    models.push({ provider: 'xai', model: 'grok-4-1-reasoning' });
+    models.push({ provider: 'xai', model: 'grok-3' });
   }
 
   if (process.env.OLLAMA_BASE_URL) {
     console.log(`  Ollama: ${process.env.OLLAMA_BASE_URL}`);
-    models.push({ provider: 'ollama', model: 'llama3' });
+    models.push({ provider: 'ollama', model: 'llama3.3' });
   }
 
   return models;

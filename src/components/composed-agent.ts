@@ -250,7 +250,7 @@ export class ComposedAgent {
     query: string,
     scratchpad: Scratchpad
   ): AsyncGenerator<ToolStartEvent | ToolEndEvent | ToolErrorEvent, void> {
-    for (const toolCall of response.tool_calls!) {
+    for (const toolCall of response.tool_calls ?? []) {
       const toolName = toolCall.name;
       const toolArgs = toolCall.args as Record<string, unknown>;
 

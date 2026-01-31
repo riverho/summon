@@ -9,14 +9,14 @@ import { Runnable } from '@langchain/core/runnables';
 import { z } from 'zod';
 
 export const DEFAULT_PROVIDER = 'openai';
-export const DEFAULT_MODEL = 'gpt-5.2';
+export const DEFAULT_MODEL = 'gpt-4o';
 
 // Fast model variants by provider for lightweight tasks like summarization
 const FAST_MODELS: Record<string, string> = {
-  openai: 'gpt-4.1',
-  anthropic: 'claude-haiku-4-5',
-  google: 'gemini-3-flash-preview',
-  xai: 'grok-4-1-fast-reasoning',
+  openai: 'gpt-4o-mini',
+  anthropic: 'claude-haiku-4-20250514',
+  google: 'gemini-2.5-flash',
+  xai: 'grok-3',
 };
 
 /**

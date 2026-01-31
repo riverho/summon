@@ -1,3 +1,5 @@
+import { execSync } from 'node:child_process';
+
 /**
  * Git Skill Module
  * 
@@ -20,17 +22,21 @@ interface GitExecResult {
 }
 
 async function execGit(args: string[], cwd?: string): Promise<GitExecResult> {
-  const proc = await Bun.spawn(['git', ...args], {
-    cwd: cwd || process.cwd(),
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
-
-  const stdout = await new Response(proc.stdout).text();
-  const stderr = await new Response(proc.stderr).text();
-  const code = await proc.exited;
-
-  return { stdout, stderr, code };
+  try {
+    const stdout = execSync('git ' + args.join(' '), {
+      cwd: cwd || process.cwd(),
+      encoding: 'utf-8',
+      maxBuffer: 10 * 1024 * 1024, // 10MB
+    });
+    return { stdout, stderr: '', code: 0 };
+  } catch (error: unknown) {
+    const err = error as { stdout?: string; stderr?: string; status?: number };
+    return {
+      stdout: err.stdout || '',
+      stderr: err.stderr || String(error),
+      code: err.status || 1,
+    };
+  }
 }
 
 // ============================================================================
