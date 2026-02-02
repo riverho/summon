@@ -1,13 +1,23 @@
-# AGENTS.md - Braddy Workspace Guide
+# AGENTS.md - Summon AI Framework Guide
 
-Purpose: build and maintain the Braddy composable agent framework and its portable YAML agents.
+**Vision:** 🦞 Summon your agents in just one-line with Clawdbot. Assemble multi-agent bots for your workflow. Built for OpenClaw community.
 
-## Project Snapshot
+**What is Summon AI?**
+A CLI tool for composing multi-agent bots that last by design. It's a framework for building composable, portable AI agents from the command line.
 
-- Framework: composable agents with portable YAML definitions (persona + skills + config).
-- Composition: personas + skills merged into a system prompt; skills declare required tools.
-- Runtime: event-driven loop yields `thinking`, `tool_start`, `tool_end`, `done`.
-- Component discovery (priority): `src/builtin/` -> `~/.braddy/components/` -> `.braddy/components/`.
+**Core Identity:**
+- **CLI tool for AI agents** — One-line composition: `summon compose "..."`
+- **Composable agents** — Build from personas + skills
+- **Multi-agent orchestration** — Coordinate multiple agents
+- **Memory that lasts** — Agents remember context across sessions
+- **Built for the bot community** — Not corporations
+
+## Project Structure
+
+- **Framework:** Composible agents with portable YAML definitions
+- **Composition:** Personas + skills merged into system prompts
+- **Runtime:** Event-driven loop emitting `thinking`, `tool_start`, `tool_end`, `done`
+- **Discovery:** `src/builtin/` → `~/.braddy/components/` → `.braddy/components/`
 
 ## Key Paths
 
@@ -18,39 +28,12 @@ Purpose: build and maintain the Braddy composable agent framework and its portab
 - CLI: `src/cli/index.ts`
 - Examples: `examples/agents/`
 
-## YAML Agent Format (portable)
+## CLI Commands
 
-Required sections:
-- `persona`: role, goal, backstory, behavior (style, priorities, avoidances)
-- `skills`: list of skill entries with `requiredTools` and `promptFragment`
-- `model`: provider, model, maxIterations
+- **Quick compose:** `summon compose "Analyze this" -p analyst -s finance`
+- **Run with YAML:** `summon run --ritual ./my-agent.yaml`
+- **List components:** `summon components list`
 
-See: `examples/agents/financial-analyst.yaml` for a complete agent file.
+## NOT a Financial Analyst Agent
 
-## Tool Binding Rules
-
-- Skills declare `requiredTools`.
-- Only declared tools get bound to the composed agent.
-- Tool registration happens via the global tool registry in user code.
-
-## CLI Usage
-
-- Run with YAML config:
-  - `braddy run "Analyze AAPL" --config ./examples/agents/financial-analyst.yaml`
-- Quick compose from components:
-  - `braddy compose "Analyze AAPL" --persona analyst --skills finance`
-- List components:
-  - `braddy components list`
-
-## Coding Conventions
-
-- Keep YAML agent files self-contained and portable.
-- Add new personas/skills to `src/builtin/` and document in README if user-facing.
-- Favor explicit schemas in `src/components/types.ts` when extending formats.
-- Preserve event types emitted by runtime; add new ones only with clear use cases.
-
-## Verification Notes
-
-- Type checking passes; CLI help runs; built-ins are discoverable.
-- If you change discovery rules or YAML schema, update README and example YAMLs.
-
+Summon AI is a **framework**, not a specific agent. The financial-analyst.yaml example is just ONE use case. Do not treat Summon as being "a financial analyst agent" — it can build ANY type of agent.
