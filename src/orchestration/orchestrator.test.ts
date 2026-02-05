@@ -88,6 +88,24 @@ describe('AgentOrchestrator', () => {
     expect(done).toBeTruthy();
   });
 
+  test('hierarchical injects coordinator planning contract into coordinator system prompt', async () => {
+    const orchestrator = new AgentOrchestrator({
+      name: 'hier-inject',
+      version: '1.0.0',
+      orchestration: { pattern: 'hierarchical', maxAgents: 5, maxIterations: 5, timeoutMs: 60_000 },
+      agents: [
+        { id: 'coord', persona: { role: 'C', goal: 'x', backstory: 'x' }, skills: [] },
+        { id: 'worker', persona: { role: 'W', goal: 'x', backstory: 'x' }, skills: [] },
+      ],
+    } as any);
+
+    await orchestrator.initialize();
+    const spec = (orchestrator as any).agents.get('coord')?.spec;
+    expect(spec).toBeTruthy();
+    expect(String(spec.systemPrompt)).toMatch(/Coordinator Planning Contract/i);
+    expect(String(spec.systemPrompt)).toMatch(/\"run\"/);
+  });
+
   test('hierarchical follows coordinatorPlanOverride (run subset + final)', async () => {
     const orchestrator = new AgentOrchestrator({
       name: 'hier-plan',

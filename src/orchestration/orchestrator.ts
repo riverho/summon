@@ -95,11 +95,23 @@ export class AgentOrchestrator {
 
       // NOTE: composeAgent will resolve $ref via registry internally.
       // For node.ritual compositions, registry resolution happens inside composeAgent.
-      const spec = composeAgent(composition);
+      let spec = composeAgent(composition);
 
       // Node-level model override (optional)
       if (node.model?.primary) {
         (spec as any).model = node.model.primary;
+      }
+
+      // Coordinator prompt injection (hierarchical pattern)
+      // We inject a strict planning contract into the *coordinator* system prompt
+      // so it outputs a machine-readable plan.
+      if (this.config.orchestration.pattern === 'hierarchical') {
+        const firstId = this.config.agents[0]?.id;
+        if (firstId && node.id === firstId) {
+          const contract = `\n\n## Coordinator Planning Contract (STRICT)\n\nYou are the **Coordinator** for a multi-agent run.\n\nYou MUST output a plan as STRICT JSON (no prose).\nPrefer wrapping in a \`\`\`json code block.\n\nSchema:\n{\n  \"run\": [\"agentId\", ...],\n  \"pattern\": \"parallel\" | \"sequential\",\n  \"final\": \"agentId\" | null,\n  \"handoffs\": [{\"from\": \"a\", \"to\": \"b\"}]\n}\n\nRules:\n- Use only agentIds from this team: ${this.config.agents.map(a => a.id).join(', ')}\n- \"run\" must NOT include yourself (${node.id}).\n- If you choose \"final\", it must be one of the agentIds (not yourself).\n- Keep \"handoffs\" empty unless you are certain.\n- If unsure, choose a minimal safe plan: {\"run\": [${JSON.stringify(this.config.agents.slice(1).map(a => a.id)[0] ?? '')}], \"pattern\": \"parallel\", \"final\": null, \"handoffs\": []}\n`;
+
+          spec = { ...spec, systemPrompt: `${spec.systemPrompt}${contract}` };
+        }
       }
 
       const agent = ComposedAgent.create(spec);

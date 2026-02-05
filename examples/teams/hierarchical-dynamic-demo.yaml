@@ -1,0 +1,33 @@
+name: hierarchical-dynamic-demo
+version: '1.0.0'
+description: Dynamic hierarchical demo — coordinator should output JSON plan
+
+orchestration:
+  pattern: hierarchical
+  maxAgents: 5
+  maxIterations: 10
+  timeoutMs: 60000
+
+agents:
+  # Coordinator: use a ritual with tools so it can call the LLM and output a plan
+  - id: coord
+    ritual: summon://examples/agents/financial-analyst.yaml
+
+  # Workers: simple no-tools agents (will currently short-circuit with "No tools available")
+  - id: workerA
+    persona:
+      role: "Worker A"
+      goal: "Do the subtask assigned by coordinator"
+      backstory: "Worker agent."
+    skills: []
+
+  - id: workerB
+    persona:
+      role: "Worker B"
+      goal: "Do the subtask assigned by coordinator"
+      backstory: "Worker agent."
+    skills: []
+
+output:
+  format: markdown
+  aggregator: concatenate
