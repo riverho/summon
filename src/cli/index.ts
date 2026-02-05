@@ -12,8 +12,9 @@ import {
 import { composeAgent, quickCompose, type ComposedAgentSpec } from '../components/composer.js';
 import { ComposedAgent } from '../components/composed-agent.js';
 import { globalToolRegistry } from '../runtime/tools.js';
-import { ChatHistoryManager } from '../runtime/chat-history.js';
+import { ChatHistoryManager, generateSessionId } from '../runtime/chat-history.js';
 import { AgentOrchestrator } from '../orchestration/orchestrator.js';
+import { createStorageAdapter } from '../storage/index.js';
 import { parse as parseYaml } from 'yaml';
 import { readFileSync } from 'fs';
 
@@ -333,7 +334,9 @@ program
   .argument('<query>', 'The task/query to run')
   .option('-v, --verbose', 'Show per-agent events')
   .option('--json', 'Output JSON')
-  .action(async (teamYaml: string, query: string, options: { verbose?: boolean; json?: boolean }) => {
+  .option('--session <id>', 'Persist this orchestration run under a session id')
+  .option('--new-session', 'Force a new persisted session id')
+  .action(async (teamYaml: string, query: string, options: { verbose?: boolean; json?: boolean; session?: string; newSession?: boolean }) => {
     const resolved = resolvePath(teamYaml);
     const raw = readFileSync(resolved, 'utf-8');
     const parsed = parseYaml(raw);
@@ -341,11 +344,30 @@ program
     const orchestrator = AgentOrchestrator.fromObject(parsed);
     await orchestrator.initialize();
 
+    // Persist orchestration runs via StorageAdapter (single persistence path)
+    const storage = createStorageAdapter();
+    const sessionId = options.newSession ? generateSessionId() : (options.session ?? generateSessionId());
+
+    // Record the user query as the session start
+    await storage.writeEvent(sessionId, {
+      timestamp: new Date().toISOString(),
+      type: 'user',
+      payload: { query },
+    });
+
     const events: any[] = [];
     let finalResult = '';
 
     for await (const ev of orchestrator.run(query)) {
       events.push(ev);
+
+      // Persist orchestration events as system events
+      await storage.writeEvent(sessionId, {
+        timestamp: new Date().toISOString(),
+        type: 'system',
+        payload: { kind: 'orchestration_event', event: ev },
+      });
+
       if (options.verbose) {
         if (ev.type === 'agent_start') console.log(`[agent_start] ${ev.agentId}`);
         if (ev.type === 'agent_done') console.log(`[agent_done] ${ev.agentId}`);
@@ -356,12 +378,28 @@ program
       }
     }
 
+    // Record final result as assistant answer so `sessions show` works
+    await storage.writeEvent(sessionId, {
+      timestamp: new Date().toISOString(),
+      type: 'assistant',
+      payload: {
+        answer: finalResult,
+        summary: `Orchestration result (${resolved})`,
+        metadata: {
+          model: 'orchestrator',
+          iterations: 0,
+          toolsUsed: [],
+        },
+      },
+    });
+
     if (options.json) {
-      console.log(JSON.stringify({ result: finalResult, events }, null, 2));
+      console.log(JSON.stringify({ result: finalResult, events, sessionId }, null, 2));
       return;
     }
 
     console.log(finalResult);
+    console.log(`\n[Session saved: ${sessionId}]`);
   });
 
 // ============================================================================
