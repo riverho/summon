@@ -13,6 +13,9 @@ import { composeAgent, quickCompose, type ComposedAgentSpec } from '../component
 import { ComposedAgent } from '../components/composed-agent.js';
 import { globalToolRegistry } from '../runtime/tools.js';
 import { ChatHistoryManager } from '../runtime/chat-history.js';
+import { AgentOrchestrator } from '../orchestration/orchestrator.js';
+import { parse as parseYaml } from 'yaml';
+import { readFileSync } from 'fs';
 
 // Load environment variables
 config({ quiet: true });
@@ -317,6 +320,48 @@ program
       await chatHistory.save();
       console.log(`\n[Session saved: ${chatHistory.getSessionId()}]`);
     }
+  });
+
+// ============================================================================
+// Orchestration Commands
+// ============================================================================
+
+program
+  .command('orchestrate')
+  .description('Run a multi-agent team from a YAML config')
+  .argument('<teamYaml>', 'Path to team YAML (supports summon:// prefix)')
+  .argument('<query>', 'The task/query to run')
+  .option('-v, --verbose', 'Show per-agent events')
+  .option('--json', 'Output JSON')
+  .action(async (teamYaml: string, query: string, options: { verbose?: boolean; json?: boolean }) => {
+    const resolved = resolvePath(teamYaml);
+    const raw = readFileSync(resolved, 'utf-8');
+    const parsed = parseYaml(raw);
+
+    const orchestrator = AgentOrchestrator.fromObject(parsed);
+    await orchestrator.initialize();
+
+    const events: any[] = [];
+    let finalResult = '';
+
+    for await (const ev of orchestrator.run(query)) {
+      events.push(ev);
+      if (options.verbose) {
+        if (ev.type === 'agent_start') console.log(`[agent_start] ${ev.agentId}`);
+        if (ev.type === 'agent_done') console.log(`[agent_done] ${ev.agentId}`);
+        if (ev.type === 'handoff') console.log(`[handoff] ${ev.from} -> ${ev.to}`);
+      }
+      if (ev.type === 'orchestration_done') {
+        finalResult = ev.result;
+      }
+    }
+
+    if (options.json) {
+      console.log(JSON.stringify({ result: finalResult, events }, null, 2));
+      return;
+    }
+
+    console.log(finalResult);
   });
 
 // ============================================================================
