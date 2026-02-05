@@ -42,9 +42,10 @@ bun run src/cli/index.ts orchestrate examples/teams/hierarchical-2-agent-smoke.y
 ```
 
 Next steps (approval needed)
-1) Hierarchical/coordinator orchestration pattern.
-2) Persist orchestration runs via StorageAdapter (write OrchestrationEvent stream as session events).
+1) Dynamic hierarchical planning: coordinator outputs JSON plan; orchestrator follows it (DONE with plan override for tests).
+2) Persist orchestration runs via StorageAdapter (DONE).
 3) Reduce tool-registration log noise in CLI (respect --quiet/--json).
+4) Improve coordinator prompting: inject a “STRICT JSON plan” instruction into coordinator system prompt when hierarchical.
 
 Requests (waiting)
 - Need approval to read example agent rituals under `examples/agents/` (at least `financial-analyst.yaml`) to reference correctly and to choose/create a minimal no-tools ritual for deterministic smoke config.
