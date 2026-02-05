@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile, writeFile, readdir } from 'fs/promises';
+import { appendFile, mkdir, readFile, writeFile, readdir, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -179,4 +179,41 @@ export async function listLocalSessions(rootDir: string = defaultRoot()): Promis
     .map(f => f.replace(/\.jsonl$/, ''))
     .sort()
     .reverse();
+}
+
+export async function clearLocalSession(sessionId: string, rootDir: string = defaultRoot()): Promise<boolean> {
+  try {
+    const dir = join(rootDir, 'sessions');
+    const file = join(dir, `${sessionId}.jsonl`);
+    const meta = join(dir, `${sessionId}.meta.json`);
+    if (!existsSync(file) && !existsSync(meta)) return false;
+    await ensureDir(dir);
+    // Truncate events but keep meta.
+    await writeFile(file, '');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteLocalSession(sessionId: string, rootDir: string = defaultRoot()): Promise<boolean> {
+  try {
+    const dir = join(rootDir, 'sessions');
+    const file = join(dir, `${sessionId}.jsonl`);
+    const meta = join(dir, `${sessionId}.meta.json`);
+
+    let any = false;
+    if (existsSync(file)) {
+      await unlink(file);
+      any = true;
+    }
+    if (existsSync(meta)) {
+      await unlink(meta);
+      any = true;
+    }
+
+    return any;
+  } catch {
+    return false;
+  }
 }

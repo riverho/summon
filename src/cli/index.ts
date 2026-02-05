@@ -508,14 +508,11 @@ sessionsCmd
   .command('clear <sessionId>')
   .description('Clear session messages (keep file)')
   .action(async (sessionId: string) => {
-    const manager = new ChatHistoryManager({ sessionId });
-    const loaded = await manager.load();
-    if (!loaded) {
+    const cleared = await ChatHistoryManager.clearSession(sessionId);
+    if (!cleared) {
       console.log(`Session not found: ${sessionId}`);
       return;
     }
-    manager.clear();
-    await manager.save();
     console.log(`Session cleared: ${sessionId}`);
   });
 
