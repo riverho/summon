@@ -38,11 +38,13 @@ bun run src/cli/index.ts orchestrate examples/teams/parallel-1-agent.yaml "Analy
 cd /Users/river/.openclaw/workspace/projects/summon
 bun run src/cli/index.ts orchestrate examples/teams/parallel-2-agent-smoke.yaml "hello" --json
 bun run src/cli/index.ts orchestrate examples/teams/sequential-2-agent-handoff.yaml "hello" --json
+bun run src/cli/index.ts orchestrate examples/teams/hierarchical-2-agent-smoke.yaml "hello" --json
 ```
 
 Next steps (approval needed)
-1) Storage unification: move ChatHistoryManager onto LocalStorageAdapter (single persistence path).
-2) Add a minimal automated smoke test (bun test) for orchestrate termination + event presence.
+1) Hierarchical/coordinator orchestration pattern.
+2) Persist orchestration runs via StorageAdapter (write OrchestrationEvent stream as session events).
+3) Reduce tool-registration log noise in CLI (respect --quiet/--json).
 
 Requests (waiting)
 - Need approval to read example agent rituals under `examples/agents/` (at least `financial-analyst.yaml`) to reference correctly and to choose/create a minimal no-tools ritual for deterministic smoke config.

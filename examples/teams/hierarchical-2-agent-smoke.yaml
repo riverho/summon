@@ -1,0 +1,28 @@
+name: hierarchical-2-agent-smoke
+version: '1.0.0'
+description: Hierarchical pattern (coordinator then worker) using no-tools agents
+
+orchestration:
+  pattern: hierarchical
+  maxAgents: 5
+  maxIterations: 5
+  timeoutMs: 60000
+
+agents:
+  - id: coord
+    persona:
+      role: "Coordinator"
+      goal: "Summarize the task in one short sentence"
+      backstory: "No-tools smoke coordinator."
+    skills: []
+
+  - id: worker
+    persona:
+      role: "Worker"
+      goal: "Acknowledge the coordinator context"
+      backstory: "No-tools smoke worker."
+    skills: []
+
+output:
+  format: markdown
+  aggregator: concatenate

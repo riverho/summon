@@ -59,6 +59,35 @@ describe('AgentOrchestrator', () => {
     expect(done.result.length).toBeGreaterThan(0);
   });
 
+  test('hierarchical runs coordinator then emits implicit handoff to others', async () => {
+    const orchestrator = new AgentOrchestrator({
+      name: 'hier',
+      version: '1.0.0',
+      orchestration: { pattern: 'hierarchical', maxAgents: 5, maxIterations: 5, timeoutMs: 60_000 },
+      agents: [
+        { id: 'coord', persona: { role: 'C', goal: 'x', backstory: 'x' }, skills: [] },
+        { id: 'worker', persona: { role: 'W', goal: 'x', backstory: 'x' }, skills: [] },
+      ],
+      output: { format: 'markdown', aggregator: 'concatenate' },
+    } as any);
+
+    await orchestrator.initialize();
+    const events = await collect(orchestrator.run('hello'));
+
+    // coordinator start should appear before worker start
+    const coordStartIdx = events.findIndex(e => (e as any).type === 'agent_start' && (e as any).agentId === 'coord');
+    const workerStartIdx = events.findIndex(e => (e as any).type === 'agent_start' && (e as any).agentId === 'worker');
+    expect(coordStartIdx).toBeGreaterThanOrEqual(0);
+    expect(workerStartIdx).toBeGreaterThanOrEqual(0);
+    expect(coordStartIdx).toBeLessThan(workerStartIdx);
+
+    // implicit handoff should exist
+    expect(events.some(e => (e as any).type === 'handoff' && (e as any).from === 'coord' && (e as any).to === 'worker')).toBe(true);
+
+    const done = [...events].reverse().find(e => (e as any).type === 'orchestration_done') as any;
+    expect(done).toBeTruthy();
+  });
+
   test('cycle detection rejects cyclic graphs', () => {
     expect(() =>
       new AgentOrchestrator({
