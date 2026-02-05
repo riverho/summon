@@ -522,7 +522,8 @@ sessionsCmd
 sessionsCmd
   .command('show <sessionId>')
   .description('Show session content')
-  .action(async (sessionId: string) => {
+  .option('--events', 'Also print stored system/orchestration events (raw)')
+  .action(async (sessionId: string, options: { events?: boolean }) => {
     const history = await ChatHistoryManager.getSession(sessionId);
     if (!history) {
       console.log(`Session not found: ${sessionId}`);
@@ -538,6 +539,22 @@ sessionsCmd
         if (msg.answer) {
           console.log(`    → ${msg.summary}`);
         }
+      }
+    }
+
+    if (options.events) {
+      const storage = createStorageAdapter();
+      const events = await storage.readEvents(sessionId);
+      const systemEvents = events.filter(e => e.type === 'system');
+
+      console.log('\n---\nEvents (system):');
+      if (systemEvents.length === 0) {
+        console.log('  (none)');
+        return;
+      }
+
+      for (const ev of systemEvents) {
+        console.log(JSON.stringify(ev, null, 2));
       }
     }
   });
