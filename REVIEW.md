@@ -60,6 +60,11 @@ This is directionally correct and aligns with `MULTI_AGENT_IMPLEMENTATION_PLAN.m
    - Option A: re-implement ChatHistoryManager on top of `StorageAdapter`.
    - Option B: treat ChatHistoryManager as “UI session history” and StorageAdapter as “system events” (but then document it clearly).
 
+## Addendum (Milestone 2)
+
+- `examples/teams/*.yaml` now exists (parallel + sequential + no-tools smoke).
+- Recommended smoke runs are documented in `STATUS.md`.
+
 ## Test checklist
 
 Run locally:

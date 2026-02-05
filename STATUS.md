@@ -1,6 +1,6 @@
 # Status
 
-Milestone 1 - Orchestrator DAG + Events
+Milestone 1 - Orchestrator DAG + Events (DONE)
 
 Changed
 - Implemented dependency graph validation and cycle detection for listenFrom/outputTo wiring.
@@ -11,10 +11,39 @@ Changed
 Files touched
 - src/orchestration/orchestrator.ts
 - STATUS.md
+- REVIEW.md
 
 Commands to run
-- npm run typecheck
+- bun run typecheck
+
+Milestone 2 - Examples + Smoke (IN PROGRESS)
+
+Added
+- examples/teams/parallel-1-agent.yaml
+- examples/teams/parallel-2-agent-smoke.yaml (no tools; validates handoff events)
+- examples/teams/sequential-2-agent-handoff.yaml (no tools; validates listenFrom)
+
+How to run (exact commands)
+
+1) 1-agent (uses ritual; requires API keys for real model/tooling):
+
+```bash
+cd /Users/river/.openclaw/workspace/projects/summon
+bun run src/cli/index.ts orchestrate examples/teams/parallel-1-agent.yaml "Analyze AAPL revenue growth" --verbose
+```
+
+2) Smoke (no tools; should terminate deterministically even without API keys):
+
+```bash
+cd /Users/river/.openclaw/workspace/projects/summon
+bun run src/cli/index.ts orchestrate examples/teams/parallel-2-agent-smoke.yaml "hello" --json
+bun run src/cli/index.ts orchestrate examples/teams/sequential-2-agent-handoff.yaml "hello" --json
+```
 
 Next steps (approval needed)
-1. Proceed to Milestone 2: CLI summon:// support for orchestrate + add examples/teams/*.yaml.
+1) Storage unification: move ChatHistoryManager onto LocalStorageAdapter (single persistence path).
+2) Add a minimal automated smoke test (bun test) for orchestrate termination + event presence.
 
+Requests (waiting)
+- Need approval to read example agent rituals under `examples/agents/` (at least `financial-analyst.yaml`) to reference correctly and to choose/create a minimal no-tools ritual for deterministic smoke config.
+- Need approval to read LLM runtime/model config files (likely under `src/runtime/`) to confirm if a no-API/mock model exists for deterministic smoke runs.

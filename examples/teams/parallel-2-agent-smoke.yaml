@@ -1,0 +1,29 @@
+name: parallel-2-agent-smoke
+version: '1.0.0'
+description: Two-agent parallel DAG smoke test with handoff events (no tools)
+
+orchestration:
+  pattern: parallel
+  maxAgents: 5
+  maxIterations: 5
+  timeoutMs: 60000
+
+agents:
+  - id: a
+    outputTo: [b]
+    persona:
+      role: "Agent A"
+      goal: "Say hello in one sentence"
+      backstory: "Deterministic smoke agent (no tools)."
+    skills: []
+
+  - id: b
+    persona:
+      role: "Agent B"
+      goal: "Acknowledge upstream context"
+      backstory: "Deterministic smoke agent (no tools)."
+    skills: []
+
+output:
+  format: markdown
+  aggregator: concatenate

@@ -1,0 +1,17 @@
+name: parallel-1-agent
+version: '1.0.0'
+description: Minimal parallel orchestration (1 agent via ritual)
+
+orchestration:
+  pattern: parallel
+  maxAgents: 3
+  maxIterations: 10
+  timeoutMs: 60000
+
+agents:
+  - id: analyst
+    ritual: summon://examples/agents/financial-analyst.yaml
+
+output:
+  format: markdown
+  aggregator: concatenate

@@ -1,0 +1,29 @@
+name: sequential-2-agent-handoff
+version: '1.0.0'
+description: Two-agent sequential run with an explicit dependency (handoff)
+
+orchestration:
+  pattern: sequential
+  maxAgents: 5
+  maxIterations: 10
+  timeoutMs: 60000
+
+agents:
+  - id: a
+    persona:
+      role: "Agent A"
+      goal: "Produce a short fixed message"
+      backstory: "Deterministic smoke agent (no tools)."
+    skills: []
+
+  - id: b
+    listenFrom: [a]
+    persona:
+      role: "Agent B"
+      goal: "Echo upstream context header"
+      backstory: "Deterministic smoke agent (no tools)."
+    skills: []
+
+output:
+  format: markdown
+  aggregator: concatenate
