@@ -1,0 +1,89 @@
+# MCP Server Configuration for Summon
+# Add MCP servers here to extend summon with additional tools
+
+mcpServers:
+  # ==========================================================================
+  # Documentation Lookup (Context7)
+  # ==========================================================================
+  - name: context7
+    command: npx
+    args: ["-y", "@upstash/context7-mcp"]
+    env:
+      # Context7 requires UPSTASH_REST_API_URL and UPSTASH_REST_API_TOKEN
+      # Get your free credentials at: https://console.upstash.com/
+      UPSTASH_REST_API_URL: "${UPSTASH_REST_API_URL}"
+      UPSTASH_REST_API_TOKEN: "${UPSTASH_REST_API_TOKEN}"
+    enabled: true
+    description: "Context7 provides access to documentation from 700+ repositories including LangChain, React, Python docs, and more"
+    tools:
+      - context7_browse
+      - context7_search
+
+  # ==========================================================================
+  # Filesystem Access
+  # ==========================================================================
+  - name: filesystem
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "/Users/river/clawd/projects/summon"]
+    enabled: false
+    description: "Read, write, and manage files on your filesystem"
+    tools:
+      - read_file
+      - write_file
+      - list_directory
+
+  # ==========================================================================
+  # GitHub Integration
+  # ==========================================================================
+  - name: github
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_TOKEN: "${GITHUB_TOKEN}"
+    enabled: false
+    description: "Access GitHub repositories, issues, pull requests, and code"
+    tools:
+      - github_get_file
+      - github_create_file
+      - github_search_code
+      - github_list_issues
+
+  # ==========================================================================
+  # PostgreSQL Database
+  # ==========================================================================
+  - name: postgres
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-postgres"]
+    env:
+      POSTGRES_CONNECTION_STRING: "${POSTGRES_CONNECTION_STRING}"
+    enabled: false
+    description: "Query and manage PostgreSQL databases"
+    tools:
+      - postgres_query
+      - postgres_list_tables
+
+  # ==========================================================================
+  # Browser Automation (Puppeteer)
+  # ==========================================================================
+  - name: puppeteer
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-puppeteer"]
+    enabled: false
+    description: "Navigate and extract content from web pages"
+    tools:
+      - browser_navigate
+      - browser_screenshot
+      - browser_click
+
+# ==========================================================================
+# Environment Variables Required
+# ==========================================================================
+# For Context7: Get free credentials at https://console.upstash.com/
+#   - UPSTASH_REST_API_URL
+#   - UPSTASH_REST_API_TOKEN
+#
+# For GitHub: Generate token at https://github.com/settings/tokens
+#   - GITHUB_TOKEN (with repo and read:org permissions)
+#
+# For Postgres: Connection string format
+#   - POSTGRES_CONNECTION_STRING=postgresql://user:password@host:5432/db

@@ -1,0 +1,42 @@
+id: finance
+name: Financial Data Analysis
+capabilities:
+  - Real-time and historical stock prices
+  - Financial metrics (P/E, margins, growth rates, valuations)
+  - SEC filings analysis (10-K, 10-Q, 8-K)
+  - Company fundamentals and balance sheet analysis
+  - Analyst estimates and consensus targets
+  - Insider trading activity monitoring
+  - Revenue segment breakdowns
+  - Cash flow analysis
+requiredTools:
+  - financial_search
+triggerKeywords:
+  - stock
+  - price
+  - revenue
+  - earnings
+  - filing
+  - SEC
+  - margin
+  - valuation
+  - market cap
+  - dividend
+  - EPS
+  - cash flow
+promptFragment: |
+  You have access to comprehensive financial data including:
+  - Real-time and historical stock prices
+  - Key financial metrics and ratios (P/E, EV/EBITDA, margins, growth rates)
+  - SEC filings (10-K annual reports, 10-Q quarterly reports, 8-K current reports)
+  - Analyst estimates, price targets, and consensus ratings
+  - Insider trading activity and ownership changes
+  - Revenue segment breakdowns and geographic data
+
+  When presenting financial data:
+  - Always cite specific data points with dates
+  - Use tables for comparisons (max 3 columns for readability)
+  - Abbreviate: Rev, Op Inc, Net Inc, OCF, FCF, GM, OM, EPS
+  - Use compact numbers: 102.5B not $102,466,000,000
+  - Include YoY growth rates when relevant
+  - Never fabricate numbers - if data is unavailable, say so

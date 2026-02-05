@@ -1,4 +1,4 @@
-// Braddy - Composable Agent Framework
+// Summon - Composable Agent Framework
 // Main entry point for programmatic usage
 
 // Component Types
@@ -85,10 +85,10 @@ export {
 } from './runtime/memory.js';
 
 export {
-  Scratchpad,
-  ScratchpadEntry,
+  Session,
+  SessionEntry,
   ToolContext,
-} from './runtime/scratchpad.js';
+} from './runtime/session.js';
 
 export {
   ToolRegistry,

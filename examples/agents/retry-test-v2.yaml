@@ -1,0 +1,22 @@
+# Test retry mechanism with failing tool in working context
+name: retry-test-agent
+version: 1.0.0
+
+persona:
+  role: Test Agent
+  goal: Test retry mechanism
+  backstory: "A test agent for retry testing"
+
+skills:
+  - id: file
+    capabilities:
+      - Test retry
+    requiredTools:
+      - failing_tool
+    promptFragment: |
+      This skill tests retry mechanism
+
+model:
+  primary: gpt-4o-mini
+  provider: openai
+  maxIterations: 3

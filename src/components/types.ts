@@ -27,6 +27,15 @@ export const BehaviorSchema = z.object({
 export type Behavior = z.infer<typeof BehaviorSchema>;
 
 /**
+ * A persona reference (for composable personas)
+ */
+export const PersonaRefSchema = z.object({
+  $ref: z.string().describe('Reference to a persona by ID'),
+});
+
+export type PersonaRef = z.infer<typeof PersonaRefSchema>;
+
+/**
  * A persona defines the agent's identity, role, and communication style
  */
 export const PersonaSchema = z.object({
@@ -40,9 +49,24 @@ export const PersonaSchema = z.object({
 
 export type Persona = z.infer<typeof PersonaSchema>;
 
+/**
+ * Union type for inline persona or persona reference
+ */
+export const PersonaOrRefSchema = z.union([PersonaRefSchema, PersonaSchema]);
+export type PersonaOrRef = z.infer<typeof PersonaOrRefSchema>;
+
 // ============================================================================
 // Skill Types
 // ============================================================================
+
+/**
+ * A skill reference (for composable skills)
+ */
+export const SkillRefSchema = z.object({
+  $ref: z.string().describe('Reference to a skill by ID'),
+});
+
+export type SkillRef = z.infer<typeof SkillRefSchema>;
 
 /**
  * A skill defines a capability with required tools and prompt fragments
@@ -58,6 +82,12 @@ export const SkillSchema = z.object({
 });
 
 export type Skill = z.infer<typeof SkillSchema>;
+
+/**
+ * Union type for inline skill or skill reference
+ */
+export const SkillOrRefSchema = z.union([SkillRefSchema, SkillSchema]);
+export type SkillOrRef = z.infer<typeof SkillOrRefSchema>;
 
 // ============================================================================
 // Model Configuration
@@ -126,10 +156,10 @@ export const AgentCompositionSchema = z.object({
   description: z.string().optional(),
 
   // Persona can be inline or a reference ID
-  persona: PersonaSchema,
+  persona: PersonaOrRefSchema,
 
   // Skills can be inline definitions or reference IDs
-  skills: z.array(SkillSchema).default([]),
+  skills: z.array(SkillOrRefSchema).default([]),
 
   // Model configuration
   model: ModelConfigSchema.optional(),

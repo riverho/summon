@@ -1,0 +1,46 @@
+id: file
+name: File Operations
+capabilities:
+  - Read file contents with metadata
+  - Write content to files with safety checks
+  - List directory contents with file/directory metadata
+  - Create new directories with optional recursive creation
+
+requiredTools:
+  - read_file
+  - write_file
+  - list_directory
+  - create_directory
+
+optionalTools: []
+
+triggerKeywords:
+  - read
+  - file
+  - write
+  - save
+  - list
+  - directory
+  - folder
+  - create
+  - mkdir
+  - ls
+  - cat
+  - edit
+  - view
+  - open
+  - contents
+  - path
+  - exists
+  - size
+  - modified
+
+promptFragment: |
+  You can perform file system operations:
+  - Read files: get contents, size, and modification dates
+  - Write files: create or overwrite files with content
+  - List directories: see files and folders with metadata
+  - Create directories: make new folders, optionally with parent directories
+
+  Paths can be relative (to current working directory) or absolute.
+  Safety checks prevent accidental overwrites and validate paths.

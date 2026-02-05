@@ -2,14 +2,14 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { homedir } from 'os';
 
-const BRADDY_DIR = '.braddy';
+const SUMMON_DIR = '.summon_mem';
 const SETTINGS_FILE = 'settings.json';
 
 /**
- * Get the braddy config directory path
+ * Get the summon config directory path
  */
 function getConfigDir(): string {
-  return join(homedir(), BRADDY_DIR);
+  return join(homedir(), SUMMON_DIR);
 }
 
 /**

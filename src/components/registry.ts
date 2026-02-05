@@ -8,13 +8,18 @@ import {
   AgentComposition,
   PersonaSchema,
   SkillSchema,
+  SkillRefSchema,
+  PersonaRefSchema,
+  ModelConfigSchema,
+  WorkflowConfigSchema,
+  GuardrailsConfigSchema,
   AgentCompositionSchema,
   PersonaFileSchema,
   ComponentRegistry,
 } from './types.js';
 
-// BRADDY_HOME: Installation directory (for portable use from any folder)
-const BRADDY_HOME = process.env.BRADDY_HOME || join(homedir(), '.braddy');
+// SUMMON_HOME: Installation directory (for portable use from any folder)
+const SUMMON_HOME = process.env.SUMMON_HOME || join(homedir(), '.summon_mem');
 const COMPONENTS_DIR = 'components';
 const PERSONAS_DIR = 'personas';
 const SKILLS_DIR = 'skills';
@@ -24,15 +29,15 @@ function getInstallDir(): string {
   return dirname(import.meta.url.replace('file://', ''));
 }
 
-// Get the braddy home (can be overridden via BRADDY_HOME env)
-export function getBraddyHome(): string {
-  return BRADDY_HOME;
+// Get the summon home (can be overridden via SUMMON_HOME env)
+export function getSummonHome(): string {
+  return SUMMON_HOME;
 }
 
-// Resolve path: supports braddy:// prefix for installation-relative paths
+// Resolve path: supports summon:// prefix for installation-relative paths
 export function resolvePath(inputPath: string): string {
-  // braddy:// prefix → relative to installation root
-  if (inputPath.startsWith('braddy://')) {
+  // summon:// prefix → relative to installation root
+  if (inputPath.startsWith('summon://')) {
     // getInstallDir() returns src/, go up 2 levels to reach installation root
     return join(getInstallDir(), '..', '..', inputPath.slice(9));
   }
@@ -115,13 +120,13 @@ export function createComponentRegistry(): ComponentRegistry {
   for (const [id, p] of loadPersonasFromDir(join(builtinDir, PERSONAS_DIR))) registry.personas.set(id, p);
   for (const [id, s] of loadSkillsFromDir(join(builtinDir, SKILLS_DIR))) registry.skills.set(id, s);
 
-  // User global ~/.braddy/components/
-  for (const [id, p] of loadPersonasFromDir(join(BRADDY_HOME, COMPONENTS_DIR, PERSONAS_DIR))) registry.personas.set(id, p);
-  for (const [id, s] of loadSkillsFromDir(join(BRADDY_HOME, COMPONENTS_DIR, SKILLS_DIR))) registry.skills.set(id, s);
+  // User global ~/.summon_mem/components/
+  for (const [id, p] of loadPersonasFromDir(join(SUMMON_HOME, COMPONENTS_DIR, PERSONAS_DIR))) registry.personas.set(id, p);
+  for (const [id, s] of loadSkillsFromDir(join(SUMMON_HOME, COMPONENTS_DIR, SKILLS_DIR))) registry.skills.set(id, s);
 
-  // Local .braddy/
-  for (const [id, p] of loadPersonasFromDir(join(process.cwd(), '.braddy', COMPONENTS_DIR, PERSONAS_DIR))) registry.personas.set(id, p);
-  for (const [id, s] of loadSkillsFromDir(join(process.cwd(), '.braddy', COMPONENTS_DIR, SKILLS_DIR))) registry.skills.set(id, s);
+  // Local .summon_mem/
+  for (const [id, p] of loadPersonasFromDir(join(process.cwd(), '.summon_mem', COMPONENTS_DIR, PERSONAS_DIR))) registry.personas.set(id, p);
+  for (const [id, s] of loadSkillsFromDir(join(process.cwd(), '.summon_mem', COMPONENTS_DIR, SKILLS_DIR))) registry.skills.set(id, s);
 
   return registry;
 }
@@ -159,5 +164,80 @@ export function loadAgentComposition(filepath: string): AgentComposition | null 
 }
 
 export function validateComposition(composition: AgentComposition, registry: ComponentRegistry): { valid: boolean; errors: string[] } {
-  return { valid: true, errors: [] };
+  const errors: string[] = [];
+
+  // Validate persona (check for $ref or inline)
+  if (!composition.persona) {
+    errors.push("Missing required field: 'persona'");
+  } else if ('$ref' in composition.persona && composition.persona.$ref) {
+    // It's a persona reference
+    const ref = composition.persona.$ref;
+    const persona = registry.personas.get(ref);
+    if (!persona) {
+      errors.push(`Persona reference not found: '$ref: ${ref}'`);
+      errors.push(`  Suggestion: Install with 'summon install persona ${ref}' or check available personas with 'summon personas list'`);
+    }
+  } else {
+    // Validate inline persona
+    try {
+      PersonaSchema.parse(composition.persona);
+    } catch (e) {
+      errors.push(`Invalid persona: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  // Validate skills (check for $ref or inline)
+  if (composition.skills && composition.skills.length > 0) {
+    for (let i = 0; i < composition.skills.length; i++) {
+      const skill = composition.skills[i];
+      if (skill && '$ref' in skill && skill.$ref) {
+        // It's a skill reference
+        const ref = skill.$ref;
+        const foundSkill = registry.skills.get(ref);
+        if (!foundSkill) {
+          errors.push(`Skill reference not found at index ${i}: '$ref: ${ref}'`);
+          errors.push(`  Suggestion: Install with 'summon install skill ${ref}' or check available skills with 'summon skills list'`);
+        }
+      } else {
+        // Validate inline skill
+        try {
+          SkillSchema.parse(skill);
+        } catch (e) {
+          errors.push(`Invalid skill at index ${i}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+    }
+  }
+
+  // Validate model config
+  if (composition.model) {
+    try {
+      ModelConfigSchema.parse(composition.model);
+    } catch (e) {
+      errors.push(`Invalid model config: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  // Validate workflow config
+  if (composition.workflow) {
+    try {
+      WorkflowConfigSchema.parse(composition.workflow);
+    } catch (e) {
+      errors.push(`Invalid workflow config: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  // Validate guardrails config
+  if (composition.guardrails) {
+    try {
+      GuardrailsConfigSchema.parse(composition.guardrails);
+    } catch (e) {
+      errors.push(`Invalid guardrails config: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
 }

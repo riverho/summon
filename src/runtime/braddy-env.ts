@@ -7,12 +7,12 @@ export function getInstallDir(): string {
   return dirname(import.meta.url.replace('file://', ''));
 }
 
-export function getBraddyHome(): string {
-  return process.env.BRADDY_HOME || join(homedir(), '.braddy');
+export function getSummonHome(): string {
+  return process.env.SUMMON_HOME || join(homedir(), '.summon_mem');
 }
 
 export function resolvePath(inputPath: string): string {
-  if (inputPath.startsWith('braddy://')) {
+  if (inputPath.startsWith('summon://')) {
     return join(getInstallDir(), '..', inputPath.slice(9));
   }
   if (inputPath.startsWith('~/')) {
@@ -22,7 +22,7 @@ export function resolvePath(inputPath: string): string {
 }
 
 export function getDefaultAgentsDir(): string {
-  return join(getBraddyHome(), 'agents');
+  return join(getSummonHome(), 'agents');
 }
 
 export function getDefaultConfigPath(agentName: string): string {

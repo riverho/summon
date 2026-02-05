@@ -1,0 +1,23 @@
+# Broken ritual for testing retry mechanism
+# Missing closing quote and invalid YAML
+
+name: broken-test-agent
+version: 1.0.0
+
+persona:
+  role: Test Agent
+  goal: Test error handling
+  backstory: "A test agent with broken config
+
+skills:
+  - id: non-existent-skill
+    capabilities:
+      - Magic
+    requiredTools:
+      - magic_tool
+    promptFragment: |
+      This skill does not exist
+
+model:
+  primary: gpt-4o
+  provider: openai

@@ -1,0 +1,20 @@
+id: web-search
+name: Web Search
+capabilities:
+  - Current news and market events
+  - Recent company announcements
+  - Industry developments
+  - Earnings call highlights
+requiredTools:
+  - web_search
+triggerKeywords:
+  - news
+  - latest
+  - announcement
+  - recent
+  - today
+  - search
+promptFragment: |
+  You can search for current news and market events.
+  Prioritize recent, authoritative sources (major financial news outlets).
+  Note the publication date of sources.

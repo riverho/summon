@@ -4,8 +4,74 @@ import {
   Persona,
   Skill,
   ComponentRegistry,
+  PersonaRef,
+  SkillRef,
 } from './types.js';
 import { globalToolRegistry, RegisteredTool } from '../runtime/tools.js';
+import { createComponentRegistry } from './registry.js';
+
+// ============================================================================
+// $ref Resolution
+// ============================================================================
+
+// NOTE: PersonaRef / SkillRef are defined in ./types.ts.
+// Do not re-export them here, otherwise barrel exports (src/components/index.ts)
+// will collide and TypeScript will error.
+
+function isPersonaRef(obj: unknown): obj is PersonaRef {
+  return typeof obj === 'object' && obj !== null && '$ref' in obj;
+}
+
+function isSkillRef(obj: unknown): obj is SkillRef {
+  return typeof obj === 'object' && obj !== null && '$ref' in obj;
+}
+
+/**
+ * Resolve persona from composition (handles $ref or inline)
+ */
+export function resolvePersona(
+  compositionPersona: Persona | PersonaRef,
+  registry: ComponentRegistry
+): Persona | null {
+  if (isPersonaRef(compositionPersona)) {
+    const ref = compositionPersona.$ref;
+    const resolved = registry.personas.get(ref);
+    if (!resolved) {
+      console.error(`Persona reference not found: ${ref}`);
+      return null;
+    }
+    return resolved;
+  }
+  // Inline persona
+  return compositionPersona as Persona;
+}
+
+/**
+ * Resolve skills from composition (handles $ref or inline)
+ */
+export function resolveSkills(
+  compositionSkills: Array<Skill | SkillRef>,
+  registry: ComponentRegistry
+): Skill[] {
+  const resolved: Skill[] = [];
+
+  for (const skill of compositionSkills) {
+    if (isSkillRef(skill)) {
+      const ref = skill.$ref;
+      const resolvedSkill = registry.skills.get(ref);
+      if (!resolvedSkill) {
+        console.warn(`Skill reference not found: ${ref}`);
+        continue;
+      }
+      resolved.push(resolvedSkill);
+    } else {
+      // Inline skill
+      resolved.push(skill as Skill);
+    }
+  }
+
+  return resolved;
+}
 
 // ============================================================================
 // System Prompt Building
@@ -99,11 +165,14 @@ ${tools.map(t => `### ${t.name}\n\n${t.description}`).join('\n\n')}`;
 export function buildSystemPrompt(
   persona: Persona,
   skills: Skill[],
-  boundTools: RegisteredTool[]
+  boundTools: RegisteredTool[],
+  agentName?: string
 ): string {
   const personaPrompt = buildPersonaPrompt(persona);
   const skillsPrompt = buildSkillsPrompt(skills);
   const toolsPrompt = buildToolDescriptionsPrompt(boundTools);
+
+  const namePrefix = agentName ? `[${agentName}]` : '';
 
   return `${personaPrompt}
 
@@ -121,6 +190,8 @@ ${toolsPrompt}
 - Do NOT break up queries into multiple tool calls when one call can handle the request
 
 ## Response Format
+
+${namePrefix} Prefix: Start your response with ${namePrefix} for conversation clarity.
 
 - Keep responses concise and direct
 - Use tables for comparative data
@@ -241,20 +312,32 @@ export interface ComposedAgentSpec {
  * Compose an agent from an AgentComposition
  */
 export function composeAgent(composition: AgentComposition): ComposedAgentSpec {
-  const { name, persona, skills, model, workflow, guardrails } = composition;
+  const { name, persona: compositionPersona, skills: compositionSkills, model, workflow, guardrails } = composition;
+
+  // Create a registry for $ref resolution
+  const registry = createComponentRegistry();
+
+  // Resolve persona (handles $ref or inline)
+  const resolvedPersona = resolvePersona(compositionPersona, registry);
+  if (!resolvedPersona) {
+    throw new Error(`Failed to resolve persona: ${JSON.stringify(compositionPersona)}`);
+  }
+
+  // Resolve skills (handles $ref or inline)
+  const resolvedSkills = resolveSkills(compositionSkills, registry);
 
   // Use defaults if model config not provided
   const modelConfig = model ?? { primary: 'gpt-4o', provider: 'openai', maxIterations: 10 };
 
   // Bind tools based on skill requirements
-  const { tools, registeredTools, missingTools } = bindTools(skills);
+  const { tools, registeredTools, missingTools } = bindTools(resolvedSkills);
 
   if (missingTools.length > 0) {
     console.warn(`Warning: Missing tools: ${missingTools.join(', ')}`);
   }
 
   // Build system prompt
-  const systemPrompt = buildSystemPrompt(persona, skills, registeredTools);
+  const systemPrompt = buildSystemPrompt(resolvedPersona, resolvedSkills, registeredTools, name);
 
   // Create tool map for quick lookup
   const toolMap = new Map<string, StructuredToolInterface>();
@@ -264,8 +347,8 @@ export function composeAgent(composition: AgentComposition): ComposedAgentSpec {
 
   return {
     name,
-    persona,
-    skills,
+    persona: resolvedPersona,
+    skills: resolvedSkills,
     systemPrompt,
     tools,
     toolMap,

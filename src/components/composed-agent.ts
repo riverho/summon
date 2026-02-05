@@ -1,7 +1,7 @@
 import { AIMessage } from '@langchain/core/messages';
 import { StructuredToolInterface } from '@langchain/core/tools';
 import { callLlm, getFastModel } from '../runtime/llm.js';
-import { Scratchpad } from '../runtime/scratchpad.js';
+import { Session } from '../runtime/session.js';
 import { InMemoryChatHistory } from '../runtime/memory.js';
 import { ComposedAgentSpec } from './composer.js';
 import type {
@@ -117,6 +117,43 @@ Format: "[tool_call] -> [what was learned]"`;
 }
 
 // ============================================================================
+// Retry Helper
+// ============================================================================
+
+interface RetryOptions {
+  maxAttempts?: number;
+  baseDelay?: number;
+  maxDelay?: number;
+}
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: RetryOptions = {}
+): Promise<T> {
+  const maxAttempts = options.maxAttempts ?? 3;
+  const baseDelay = options.baseDelay ?? 1000;
+  const maxDelay = options.maxDelay ?? 10000;
+
+  let lastError: Error | undefined;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      if (attempt < maxAttempts) {
+        const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), maxDelay);
+        console.error(`[Retry] Tool failed (attempt ${attempt}/${maxAttempts}), retrying in ${delay}ms: ${lastError.message}`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+// ============================================================================
 // ComposedAgent Class
 // ============================================================================
 
@@ -126,6 +163,7 @@ Format: "[tool_call] -> [what was learned]"`;
 export class ComposedAgent {
   private readonly spec: ComposedAgentSpec;
   private readonly signal?: AbortSignal;
+  private lastEvent: AgentEvent | null = null;
 
   constructor(spec: ComposedAgentSpec, signal?: AbortSignal) {
     this.spec = spec;
@@ -140,20 +178,29 @@ export class ComposedAgent {
   }
 
   /**
+   * Get the last event (for chat history persistence)
+   */
+  getLastEvent(): AgentEvent | null {
+    return this.lastEvent;
+  }
+
+  /**
    * Run the agent and yield events for real-time UI updates
    */
-  async *run(query: string, inMemoryHistory?: InMemoryChatHistory): AsyncGenerator<AgentEvent> {
+  async *run(query: string, inMemoryHistory?: InMemoryChatHistory, sessionId?: string): AsyncGenerator<AgentEvent> {
     if (this.spec.tools.length === 0) {
-      yield {
-        type: 'done',
-        answer: 'No tools available. Please check your skill configuration and tool registry.',
+      const event = {
+        type: 'done' as const,
+        answer: `[${this.spec.name}] No tools available. Please check your skill configuration and tool registry.`,
         toolCalls: [],
         iterations: 0,
       };
+      this.lastEvent = event;
+      yield event;
       return;
     }
 
-    const scratchpad = new Scratchpad(query);
+    const session = new Session(query, { sessionId });
     let currentPrompt = this.buildInitialPrompt(query, inMemoryHistory);
     let iteration = 0;
 
@@ -165,70 +212,90 @@ export class ComposedAgent {
 
       // Emit thinking if there are also tool calls
       if (responseText && hasToolCalls(response)) {
-        scratchpad.addThinking(responseText);
-        yield { type: 'thinking', message: responseText };
+        session.addThinking(responseText);
+        const event = { type: 'thinking' as const, message: responseText };
+        this.lastEvent = event;
+        yield event;
       }
 
       // No tool calls = ready to generate final answer
       if (!hasToolCalls(response)) {
         // If no tools were called at all, just use the direct response
-        if (!scratchpad.hasToolResults() && responseText) {
-          yield { type: 'answer_start' };
-          yield { type: 'done', answer: responseText, toolCalls: [], iterations: iteration };
+        if (!session.hasToolResults() && responseText) {
+          const event = { type: 'answer_start' as const };
+          this.lastEvent = event;
+          yield event;
+          const prefixedAnswer = `[${this.spec.name}] ${responseText}`;
+          const doneEvent = { type: 'done' as const, answer: prefixedAnswer, toolCalls: [], iterations: iteration };
+          this.lastEvent = doneEvent;
+          yield doneEvent;
           return;
         }
 
-        // Generate final answer with full context from scratchpad
-        const fullContext = this.buildFullContextForAnswer(scratchpad);
+        // Generate final answer with full context from session
+        const fullContext = this.buildFullContextForAnswer(session);
         const qualityChecklist = this.spec.guardrails?.thinking.qualityChecklist ?? [];
         const finalPrompt = buildFinalAnswerPrompt(query, fullContext, qualityChecklist);
 
-        yield { type: 'answer_start' };
+        const answerStartEvent = { type: 'answer_start' as const };
+        this.lastEvent = answerStartEvent;
+        yield answerStartEvent;
+
         const finalResponse = await this.callModel(finalPrompt, false);
         const answer = typeof finalResponse === 'string'
           ? finalResponse
           : extractTextContent(finalResponse);
 
-        yield {
-          type: 'done',
-          answer,
-          toolCalls: scratchpad.getToolCallRecords(),
+        const prefixedAnswer = `[${this.spec.name}] ${answer}`;
+        const doneEvent = {
+          type: 'done' as const,
+          answer: prefixedAnswer,
+          toolCalls: session.getToolCallRecords(),
           iterations: iteration,
         };
+        this.lastEvent = doneEvent;
+        yield doneEvent;
         return;
       }
 
-      // Execute tools and add results to scratchpad
-      const generator = this.executeToolCalls(response, query, scratchpad);
+      // Execute tools and add results to session
+      const generator = this.executeToolCalls(response, query, session);
       let result = await generator.next();
 
       while (!result.done) {
+        this.lastEvent = result.value;
         yield result.value;
         result = await generator.next();
       }
 
-      // Build iteration prompt from scratchpad
+      // Build iteration prompt from session
       const qualityPrompts = this.spec.workflow?.thinking.qualityPrompts ?? [];
-      currentPrompt = buildIterationPrompt(query, scratchpad.getToolSummaries(), qualityPrompts);
+      currentPrompt = buildIterationPrompt(query, session.getToolSummaries(), qualityPrompts);
     }
 
     // Max iterations reached - still generate proper final answer
-    const fullContext = this.buildFullContextForAnswer(scratchpad);
+    const fullContext = this.buildFullContextForAnswer(session);
     const qualityChecklist = this.spec.guardrails?.thinking.qualityChecklist ?? [];
     const finalPrompt = buildFinalAnswerPrompt(query, fullContext, qualityChecklist);
 
-    yield { type: 'answer_start' };
+    const answerStartEvent = { type: 'answer_start' as const };
+    this.lastEvent = answerStartEvent;
+    yield answerStartEvent;
+
     const finalResponse = await this.callModel(finalPrompt, false);
     const answer = typeof finalResponse === 'string'
       ? finalResponse
       : extractTextContent(finalResponse);
 
-    yield {
-      type: 'done',
-      answer: answer || `Reached maximum iterations (${this.spec.maxIterations}).`,
-      toolCalls: scratchpad.getToolCallRecords(),
+    const prefixedAnswer = `[${this.spec.name}] ${answer || `Reached maximum iterations (${this.spec.maxIterations}).`}`;
+    const doneEvent = {
+      type: 'done' as const,
+      answer: prefixedAnswer,
+      toolCalls: session.getToolCallRecords(),
       iterations: iteration,
     };
+    this.lastEvent = doneEvent;
+    yield doneEvent;
   }
 
   /**
@@ -267,13 +334,13 @@ export class ComposedAgent {
   private async *executeToolCalls(
     response: AIMessage,
     query: string,
-    scratchpad: Scratchpad
+    session: Session
   ): AsyncGenerator<ToolStartEvent | ToolEndEvent | ToolErrorEvent, void> {
     for (const toolCall of response.tool_calls ?? []) {
       const toolName = toolCall.name;
       const toolArgs = toolCall.args as Record<string, unknown>;
 
-      const generator = this.executeToolCall(toolName, toolArgs, query, scratchpad);
+      const generator = this.executeToolCall(toolName, toolArgs, query, session);
       let result = await generator.next();
 
       while (!result.done) {
@@ -290,7 +357,7 @@ export class ComposedAgent {
     toolName: string,
     toolArgs: Record<string, unknown>,
     query: string,
-    scratchpad: Scratchpad
+    session: Session
   ): AsyncGenerator<ToolStartEvent | ToolEndEvent | ToolErrorEvent, void> {
     yield { type: 'tool_start', tool: toolName, args: toolArgs };
 
@@ -302,7 +369,12 @@ export class ComposedAgent {
         throw new Error(`Tool '${toolName}' not found`);
       }
 
-      const rawResult = await tool.invoke(toolArgs, this.signal ? { signal: this.signal } : undefined);
+      // Use retry mechanism for tool execution
+      const rawResult = await withRetry(
+        () => tool.invoke(toolArgs, this.signal ? { signal: this.signal } : undefined),
+        { maxAttempts: 3, baseDelay: 1000, maxDelay: 5000 }
+      );
+      
       const result = typeof rawResult === 'string' ? rawResult : JSON.stringify(rawResult);
       const duration = Date.now() - startTime;
 
@@ -311,16 +383,16 @@ export class ComposedAgent {
       // Generate LLM summary for context compaction
       const llmSummary = await this.summarizeToolResult(query, toolName, toolArgs, result);
 
-      // Add complete tool result to scratchpad
-      scratchpad.addToolResult(toolName, toolArgs, result, llmSummary);
+      // Add complete tool result to session
+      session.addToolResult(toolName, toolArgs, result, llmSummary);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       yield { type: 'tool_error', tool: toolName, error: errorMessage };
 
-      // Add error to scratchpad
+      // Add error to session
       const toolDescription = getToolDescription(toolName, toolArgs);
       const errorSummary = `- ${toolDescription} [FAILED]: ${errorMessage}`;
-      scratchpad.addToolResult(toolName, toolArgs, `Error: ${errorMessage}`, errorSummary);
+      session.addToolResult(toolName, toolArgs, `Error: ${errorMessage}`, errorSummary);
     }
   }
 
@@ -345,10 +417,10 @@ export class ComposedAgent {
   }
 
   /**
-   * Build full context data for final answer generation from scratchpad
+   * Build full context data for final answer generation from session
    */
-  private buildFullContextForAnswer(scratchpad: Scratchpad): string {
-    const contexts = scratchpad.getFullContexts();
+  private buildFullContextForAnswer(session: Session): string {
+    const contexts = session.getFullContexts();
 
     if (contexts.length === 0) {
       return 'No data was gathered.';
