@@ -3,7 +3,7 @@ import { composeAgent } from '../components/composer.js';
 import { createComponentRegistry, loadAgentComposition, resolvePath } from '../components/registry.js';
 import type { InMemoryChatHistory } from '../runtime/memory.js';
 import type { ComposedAgentSpec } from '../components/composer.js';
-import { MultiAgentConfigSchema, type AgentNode, type MultiAgentConfig, type OrchestrationEvent, toAgentComposition } from './types.js';
+import { CoordinatorPlanSchema, type CoordinatorPlan, MultiAgentConfigSchema, type AgentNode, type MultiAgentConfig, type OrchestrationEvent, toAgentComposition } from './types.js';
 
 export class AgentOrchestrator {
   private readonly config: MultiAgentConfig;
@@ -204,6 +204,57 @@ export class AgentOrchestrator {
     return final;
   }
 
+  private extractCoordinatorPlan(text: string): CoordinatorPlan | null {
+    if (this.config.orchestration.coordinatorPlanOverride) {
+      return CoordinatorPlanSchema.parse(this.config.orchestration.coordinatorPlanOverride);
+    }
+
+    // Try ```json ...``` fenced block first
+    const fenced = text.match(/```json\s*([\s\S]*?)\s*```/i);
+    if (fenced?.[1]) {
+      const obj = this.parseFirstJsonObject(fenced[1]);
+      if (obj) {
+        try {
+          return CoordinatorPlanSchema.parse(obj);
+        } catch {
+          // fallthrough
+        }
+      }
+    }
+
+    const obj = this.parseFirstJsonObject(text);
+    if (!obj) return null;
+
+    try {
+      return CoordinatorPlanSchema.parse(obj);
+    } catch {
+      return null;
+    }
+  }
+
+  private parseFirstJsonObject(text: string): unknown | null {
+    const start = text.indexOf('{');
+    if (start < 0) return null;
+
+    let depth = 0;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (ch === '{') depth += 1;
+      else if (ch === '}') depth -= 1;
+
+      if (depth === 0) {
+        const candidate = text.slice(start, i + 1);
+        try {
+          return JSON.parse(candidate);
+        } catch {
+          return null;
+        }
+      }
+    }
+
+    return null;
+  }
+
   private async *runHierarchical(query: string, sharedHistory?: InMemoryChatHistory): AsyncGenerator<OrchestrationEvent> {
     const order = this.config.agents.map(agent => agent.id);
     const coordinatorId = order[0];
@@ -234,84 +285,88 @@ export class AgentOrchestrator {
     const outputs = new Map<string, string>();
     outputs.set(coordinatorId, coordOutput);
 
-    // 2) Coordinator hands off to everyone else (implicit)
-    for (const id of order.slice(1)) {
+    const plan = this.extractCoordinatorPlan(coordOutput);
+
+    // Determine which agents to run after coordinator.
+    // If plan missing/invalid -> fallback: run all.
+    const validAgents = new Set(order);
+    const fallbackWorkers = order.slice(1);
+
+    const plannedWorkers = plan
+      ? plan.run.filter((id) => validAgents.has(id) && id !== coordinatorId)
+      : [];
+
+    const finalId = plan?.final && validAgents.has(plan.final) && plan.final !== coordinatorId
+      ? plan.final
+      : null;
+
+    const workers = plannedWorkers.length > 0 ? plannedWorkers : fallbackWorkers;
+
+    // 2) Coordinator hands off (implicit) to chosen workers (+ final if distinct)
+    const handoffTargets = Array.from(new Set([...
+      workers,
+      ...(finalId ? [finalId] : []),
+    ]));
+
+    for (const id of handoffTargets) {
+      if (id === coordinatorId) continue;
       yield { type: 'handoff', from: coordinatorId, to: id, data: coordOutput };
     }
 
-    // 3) Run the rest using graph-parallel scheduling, but inject coordinator output as upstream context.
-    const { depsByAgent, dependentsByAgent } = this.buildDependencyGraph();
-    const results = new Map<string, string>();
-    results.set(coordinatorId, coordOutput);
+    // 3) Run workers according to plan.pattern (default parallel)
+    const pattern = plan?.pattern ?? 'parallel';
 
-    // Remaining deps, with coordinator satisfied wherever it appears
-    const remaining = new Map<string, Set<string>>();
-    for (const [id, deps] of depsByAgent.entries()) {
-      const set = new Set(deps);
-      set.delete(coordinatorId);
-      remaining.set(id, set);
-    }
+    const runOne = async (agentId: string, emit: (e: OrchestrationEvent) => void): Promise<string> => {
+      const entry = this.agents.get(agentId);
+      if (!entry) throw new Error(`Agent not initialized: ${agentId}`);
+      const deps = [coordinatorId];
+      const input = this.formatAgentInput(query, deps, outputs);
+      emit({ type: 'agent_start', agentId });
+      const out = await this.runSingleAgent(agentId, entry.agent, input, sharedHistory, emit);
+      outputs.set(agentId, out);
+      emit({ type: 'agent_done', agentId, output: out });
+      return out;
+    };
 
     const queue = this.createEventQueue<OrchestrationEvent>();
-    const started = new Set<string>([coordinatorId]);
-    let completed = 1;
-    let inFlight = 0;
 
-    const startAgent = (agentId: string) => {
-      if (started.has(agentId)) return;
-      started.add(agentId);
-
-      const deps = Array.from(depsByAgent.get(agentId) ?? []);
-      const depsWithCoordinator = Array.from(new Set([coordinatorId, ...deps]));
-      const input = this.formatAgentInput(query, depsWithCoordinator, outputs);
-
-      const entry = this.agents.get(agentId);
-      if (!entry) {
-        queue.push({ type: 'orchestration_done', result: `Agent not initialized: ${agentId}` });
-        return;
-      }
-
-      queue.push({ type: 'agent_start', agentId });
-      inFlight += 1;
-      void (async () => {
-        const output = await this.runSingleAgent(agentId, entry.agent, input, sharedHistory, queue.push);
-        results.set(agentId, output);
-        outputs.set(agentId, output);
-        queue.push({ type: 'agent_done', agentId, output });
-
-        const dependents = Array.from(dependentsByAgent.get(agentId) ?? []);
-        for (const dependent of dependents) {
-          queue.push({ type: 'handoff', from: agentId, to: dependent, data: output });
-          remaining.get(dependent)?.delete(agentId);
+    void (async () => {
+      try {
+        if (pattern === 'sequential') {
+          for (const id of workers) {
+            await runOne(id, queue.push);
+          }
+        } else {
+          await Promise.all(workers.map((id) => runOne(id, queue.push)));
         }
 
-        completed += 1;
-        inFlight -= 1;
-
-        for (const id of order) {
-          if (id === coordinatorId) continue;
-          if ((remaining.get(id)?.size ?? 0) === 0 && !results.has(id)) {
-            startAgent(id);
+        // If there's a final synthesizer agent, run it last with upstream context from coordinator + workers.
+        if (finalId) {
+          const finalEntry = this.agents.get(finalId);
+          if (finalEntry) {
+            const deps = [coordinatorId, ...workers];
+            const finalInput = this.formatAgentInput(query, deps, outputs);
+            queue.push({ type: 'agent_start', agentId: finalId });
+            const out = await this.runSingleAgent(finalId, finalEntry.agent, finalInput, sharedHistory, queue.push);
+            outputs.set(finalId, out);
+            queue.push({ type: 'agent_done', agentId: finalId, output: out });
+            queue.push({ type: 'orchestration_done', result: `[${finalId}]\n${out}` });
+            queue.close();
+            return;
           }
         }
 
-        if (completed === order.length && inFlight === 0) {
-          const aggregated = this.aggregate(order.map(id => ({ id, result: results.get(id) ?? '' })));
-          queue.push({ type: 'orchestration_done', result: aggregated });
-          queue.close();
-        }
-      })();
-    };
-
-    for (const id of order) {
-      if (id === coordinatorId) continue;
-      if ((remaining.get(id)?.size ?? 0) === 0) {
-        startAgent(id);
+        const aggregated = this.aggregate(workers.map((id) => ({ id, result: outputs.get(id) ?? '' })));
+        queue.push({ type: 'orchestration_done', result: aggregated });
+        queue.close();
+      } catch (e) {
+        queue.push({ type: 'orchestration_done', result: `Hierarchical run failed: ${e instanceof Error ? e.message : String(e)}` });
+        queue.close();
       }
-    }
+    })();
 
-    for await (const event of queue.iterator()) {
-      yield event;
+    for await (const ev of queue.iterator()) {
+      yield ev;
     }
   }
 

@@ -88,6 +88,43 @@ describe('AgentOrchestrator', () => {
     expect(done).toBeTruthy();
   });
 
+  test('hierarchical follows coordinatorPlanOverride (run subset + final)', async () => {
+    const orchestrator = new AgentOrchestrator({
+      name: 'hier-plan',
+      version: '1.0.0',
+      orchestration: {
+        pattern: 'hierarchical',
+        maxAgents: 5,
+        maxIterations: 5,
+        timeoutMs: 60_000,
+        coordinatorPlanOverride: {
+          run: ['workerA'],
+          pattern: 'sequential',
+          final: 'final',
+          handoffs: [],
+        },
+      },
+      agents: [
+        { id: 'coord', persona: { role: 'C', goal: 'x', backstory: 'x' }, skills: [] },
+        { id: 'workerA', persona: { role: 'A', goal: 'x', backstory: 'x' }, skills: [] },
+        { id: 'workerB', persona: { role: 'B', goal: 'x', backstory: 'x' }, skills: [] },
+        { id: 'final', persona: { role: 'F', goal: 'x', backstory: 'x' }, skills: [] },
+      ],
+      output: { format: 'markdown', aggregator: 'concatenate' },
+    } as any);
+
+    await orchestrator.initialize();
+    const events = await collect(orchestrator.run('hello'));
+
+    // should start workerA + final, but NOT workerB
+    expect(events.some(e => (e as any).type === 'agent_start' && (e as any).agentId === 'workerA')).toBe(true);
+    expect(events.some(e => (e as any).type === 'agent_start' && (e as any).agentId === 'final')).toBe(true);
+    expect(events.some(e => (e as any).type === 'agent_start' && (e as any).agentId === 'workerB')).toBe(false);
+
+    const done = [...events].reverse().find(e => (e as any).type === 'orchestration_done') as any;
+    expect(done).toBeTruthy();
+  });
+
   test('cycle detection rejects cyclic graphs', () => {
     expect(() =>
       new AgentOrchestrator({

@@ -8,11 +8,26 @@ import { AgentCompositionSchema, ModelConfigSchema, PersonaOrRefSchema, SkillOrR
 export const OrchestrationPatternSchema = z.enum(['parallel', 'sequential', 'hierarchical']);
 export type OrchestrationPattern = z.infer<typeof OrchestrationPatternSchema>;
 
+// ============================================================================
+// Coordinator plan (hierarchical)
+// ============================================================================
+
+export const CoordinatorPlanSchema = z.object({
+  run: z.array(z.string()).default([]),
+  pattern: z.enum(['parallel', 'sequential']).default('parallel'),
+  final: z.string().nullable().default(null),
+  handoffs: z.array(z.object({ from: z.string(), to: z.string() })).default([]),
+});
+export type CoordinatorPlan = z.infer<typeof CoordinatorPlanSchema>;
+
 export const OrchestrationConfigSchema = z.object({
   pattern: OrchestrationPatternSchema.default('parallel'),
   maxAgents: z.number().int().positive().max(20).default(5),
   maxIterations: z.number().int().positive().default(20),
   timeoutMs: z.number().int().positive().default(120_000),
+
+  // Testing / escape hatch: bypass coordinator parsing and force a plan.
+  coordinatorPlanOverride: CoordinatorPlanSchema.optional(),
 });
 export type OrchestrationConfig = z.infer<typeof OrchestrationConfigSchema>;
 
