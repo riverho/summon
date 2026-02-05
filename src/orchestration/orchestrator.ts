@@ -194,6 +194,12 @@ export class AgentOrchestrator {
       if (event.type === 'tool_start') {
         emit({ type: 'agent_tool_call', agentId, tool: event.tool, args: event.args });
       }
+      if (event.type === 'tool_end') {
+        emit({ type: 'agent_tool_end', agentId, tool: event.tool, durationMs: event.duration });
+      }
+      if (event.type === 'tool_error') {
+        emit({ type: 'agent_tool_error', agentId, tool: event.tool, error: event.error });
+      }
     }
 
     return final;

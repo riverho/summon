@@ -53,7 +53,7 @@ describe('AgentOrchestrator', () => {
     expect(events.some(e => (e as any).type === 'agent_start')).toBe(true);
     expect(events.some(e => (e as any).type === 'handoff')).toBe(true);
 
-    const done = events.findLast(e => (e as any).type === 'orchestration_done') as any;
+    const done = [...events].reverse().find(e => (e as any).type === 'orchestration_done') as any;
     expect(done).toBeTruthy();
     expect(typeof done.result).toBe('string');
     expect(done.result.length).toBeGreaterThan(0);
