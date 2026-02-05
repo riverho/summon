@@ -1,5 +1,8 @@
 import type { StorageAdapter } from './types.js';
+import { LocalStorageAdapter } from './local.js';
+
 export * from './types.js';
+export * from './local.js';
 
 /**
  * Create a storage adapter based on SUMMON_STORAGE env.
@@ -9,7 +12,7 @@ export function createStorageAdapter(): StorageAdapter {
 
   switch (provider) {
     case 'local':
-      throw new Error('Storage adapter "local" is not implemented yet.');
+      return new LocalStorageAdapter();
     default:
       throw new Error(`Unknown storage provider: ${provider}`);
   }
