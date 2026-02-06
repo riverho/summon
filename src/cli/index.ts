@@ -334,9 +334,10 @@ program
   .argument('<query>', 'The task/query to run')
   .option('-v, --verbose', 'Show per-agent events')
   .option('--json', 'Output JSON')
+  .option('-q, --quiet', 'Minimal output (just the answer)')
   .option('--session <id>', 'Persist this orchestration run under a session id')
   .option('--new-session', 'Force a new persisted session id')
-  .action(async (teamYaml: string, query: string, options: { verbose?: boolean; json?: boolean; session?: string; newSession?: boolean }) => {
+  .action(async (teamYaml: string, query: string, options: { verbose?: boolean; json?: boolean; quiet?: boolean; session?: string; newSession?: boolean }) => {
     const resolved = resolvePath(teamYaml);
     const raw = readFileSync(resolved, 'utf-8');
     const parsed = parseYaml(raw);
@@ -368,7 +369,7 @@ program
         payload: { kind: 'orchestration_event', event: ev },
       });
 
-      if (options.verbose) {
+      if (options.verbose && !options.json && !options.quiet) {
         if (ev.type === 'agent_start') console.log(`[agent_start] ${ev.agentId}`);
         if (ev.type === 'agent_done') console.log(`[agent_done] ${ev.agentId}`);
         if (ev.type === 'handoff') console.log(`[handoff] ${ev.from} -> ${ev.to}`);
@@ -395,6 +396,11 @@ program
 
     if (options.json) {
       console.log(JSON.stringify({ result: finalResult, events, sessionId }, null, 2));
+      return;
+    }
+
+    if (options.quiet) {
+      console.log(finalResult);
       return;
     }
 
@@ -594,6 +600,9 @@ import '../builtin/skills/file/index.js';
 import { createMCPCommands } from './mcp-commands.js';
 
 function registerAvailableTools(): void {
+  const args = new Set(process.argv);
+  const shouldLog = (args.has('--verbose') || args.has('-v')) && !args.has('--json') && !args.has('--quiet') && !args.has('-q');
+  if (!shouldLog) return;
   console.log('Registered tools:');
   for (const name of globalToolRegistry.getNames()) {
     console.log(`  ✓ ${name}`);

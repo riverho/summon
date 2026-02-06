@@ -50,3 +50,49 @@ Next steps (approval needed)
 Requests (waiting)
 - Need approval to read example agent rituals under `examples/agents/` (at least `financial-analyst.yaml`) to reference correctly and to choose/create a minimal no-tools ritual for deterministic smoke config.
 - Need approval to read LLM runtime/model config files (likely under `src/runtime/`) to confirm if a no-API/mock model exists for deterministic smoke runs.
+
+Milestone 3 - Orchestration Hardening (DONE)
+
+Changed
+- Enforced overall run timeout, optional per-agent timeout, and cancellation via AbortController.
+- Added guardrails: `maxEvents` + `maxOutputChars` to stop runaway logs safely.
+- Added pause points: `orchestration.pauseAfter` supports `coordinator`, `handoff`, `final` (emits `orchestration_pause` + `orchestration_done`).
+- Centralized orchestration guard logic with truncation for oversized final output.
+
+Tests added/updated
+- `maxEvents` guardrail stops run.
+- Per-agent timeout stops slow agent.
+- External cancellation stops orchestration.
+
+Config additions (team YAML)
+- `orchestration.perAgentTimeoutMs`
+- `orchestration.maxEvents`
+- `orchestration.maxOutputChars`
+- `orchestration.pauseAfter`
+- `agents[].timeoutMs`
+
+Commands run
+- `bun run typecheck`
+- `bun test`
+
+Milestone 2 - Hierarchical Planning + Orchestration Persistence + CLI UX (DONE)
+
+Changed
+- Enforced strict JSON coordinator plans with validation; hierarchical runs now execute the planned subset through the DAG runner with coordinator context injected.
+- Added plan validation errors when dependencies are missing or IDs are invalid.
+- Orchestrate CLI now supports `--quiet`, respects `--quiet/--json` for logging, and suppresses tool registration noise unless `--verbose` is set.
+
+Files touched
+- src/orchestration/orchestrator.ts
+- src/orchestration/orchestrator.test.ts
+- src/cli/index.ts
+- STATUS.md
+
+Commands run
+- `bun run typecheck`
+- `bun test`
+
+Next steps
+1) Add a small example team YAML that demonstrates strict JSON coordinator planning.
+2) Consider emitting plan diagnostics (parsed plan) in verbose mode for easier debugging.
+3) Add a CLI flag to disable persistence for orchestration runs.

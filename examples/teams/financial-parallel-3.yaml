@@ -1,0 +1,35 @@
+name: financial-parallel-3
+version: '1.0.0'
+description: 3-agent financial analysis — parallel research/modeling with writer synthesis
+
+orchestration:
+  pattern: parallel
+  maxAgents: 5
+  maxIterations: 10
+  timeoutMs: 120000
+
+  # Optional hardening (safe defaults; adjust as needed)
+  perAgentTimeoutMs: 90000
+  maxEvents: 500
+  maxOutputChars: 50000
+
+agents:
+  # Researcher: focuses on sourcing facts (filings, investor relations, credible summaries)
+  - id: researcher
+    ritual: summon://examples/agents/financial-analyst.yaml
+    # Wiring: send output downstream
+    outputTo: [writer]
+
+  # Modeler: focuses on interpretation/financial framing/what metrics matter
+  - id: modeler
+    ritual: summon://examples/agents/financial-analyst.yaml
+    outputTo: [writer]
+
+  # Writer: synthesizes upstream context into a single coherent answer
+  - id: writer
+    ritual: summon://examples/agents/financial-analyst.yaml
+    listenFrom: [researcher, modeler]
+
+output:
+  format: markdown
+  aggregator: concatenate

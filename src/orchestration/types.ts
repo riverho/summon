@@ -25,6 +25,10 @@ export const OrchestrationConfigSchema = z.object({
   maxAgents: z.number().int().positive().max(20).default(5),
   maxIterations: z.number().int().positive().default(20),
   timeoutMs: z.number().int().positive().default(120_000),
+  perAgentTimeoutMs: z.number().int().positive().optional(),
+  maxEvents: z.number().int().positive().optional(),
+  maxOutputChars: z.number().int().positive().optional(),
+  pauseAfter: z.array(z.enum(['coordinator', 'handoff', 'final'])).optional(),
 
   // Testing / escape hatch: bypass coordinator parsing and force a plan.
   coordinatorPlanOverride: CoordinatorPlanSchema.optional(),
@@ -41,6 +45,7 @@ export const AgentNodeSchema = z.object({
   persona: PersonaOrRefSchema.optional(),
   skills: z.array(SkillOrRefSchema).optional(),
   model: ModelConfigSchema.optional(),
+  timeoutMs: z.number().int().positive().optional(),
 
   // Wiring
   outputTo: z.array(z.string()).optional(),
@@ -80,6 +85,7 @@ export type OrchestrationEvent =
   | { type: 'agent_tool_error'; agentId: string; tool: string; error: string }
   | { type: 'agent_done'; agentId: string; output: string }
   | { type: 'handoff'; from: string; to: string; data: unknown }
+  | { type: 'orchestration_pause'; stage: 'coordinator' | 'handoff' | 'final'; message: string }
   | { type: 'orchestration_done'; result: string };
 
 // ============================================================================

@@ -1,0 +1,30 @@
+name: hierarchical-financial-demo
+version: '1.0.0'
+description: Hierarchical coordinator planning (strict JSON) + execution with financial-analyst agents
+
+orchestration:
+  pattern: hierarchical
+  maxAgents: 5
+  maxIterations: 10
+  timeoutMs: 120000
+
+  # Optional hardening
+  perAgentTimeoutMs: 90000
+  maxEvents: 800
+  maxOutputChars: 80000
+
+agents:
+  # Coordinator: MUST output a strict JSON plan (the orchestrator injects the contract)
+  - id: coord
+    ritual: summon://examples/agents/financial-analyst.yaml
+
+  # Workers: also real financial agents (so the plan actually runs with tools)
+  - id: workerA
+    ritual: summon://examples/agents/financial-analyst.yaml
+
+  - id: workerB
+    ritual: summon://examples/agents/financial-analyst.yaml
+
+output:
+  format: markdown
+  aggregator: concatenate

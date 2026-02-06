@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { AgentOrchestrator } from './orchestrator.js';
+import { ComposedAgent } from '../components/composed-agent.js';
 
 function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {
   const out: T[] = [];
@@ -63,7 +64,18 @@ describe('AgentOrchestrator', () => {
     const orchestrator = new AgentOrchestrator({
       name: 'hier',
       version: '1.0.0',
-      orchestration: { pattern: 'hierarchical', maxAgents: 5, maxIterations: 5, timeoutMs: 60_000 },
+      orchestration: {
+        pattern: 'hierarchical',
+        maxAgents: 5,
+        maxIterations: 5,
+        timeoutMs: 60_000,
+        coordinatorPlanOverride: {
+          run: ['worker'],
+          pattern: 'parallel',
+          final: null,
+          handoffs: [],
+        },
+      },
       agents: [
         { id: 'coord', persona: { role: 'C', goal: 'x', backstory: 'x' }, skills: [] },
         { id: 'worker', persona: { role: 'W', goal: 'x', backstory: 'x' }, skills: [] },
@@ -92,7 +104,12 @@ describe('AgentOrchestrator', () => {
     const orchestrator = new AgentOrchestrator({
       name: 'hier-inject',
       version: '1.0.0',
-      orchestration: { pattern: 'hierarchical', maxAgents: 5, maxIterations: 5, timeoutMs: 60_000 },
+      orchestration: {
+        pattern: 'hierarchical',
+        maxAgents: 5,
+        maxIterations: 5,
+        timeoutMs: 60_000,
+      },
       agents: [
         { id: 'coord', persona: { role: 'C', goal: 'x', backstory: 'x' }, skills: [] },
         { id: 'worker', persona: { role: 'W', goal: 'x', backstory: 'x' }, skills: [] },
@@ -155,5 +172,108 @@ describe('AgentOrchestrator', () => {
         ],
       } as any)
     ).toThrow(/cycle/i);
+  });
+
+  test('guardrails stop orchestration when maxEvents exceeded', async () => {
+    const orchestrator = new AgentOrchestrator({
+      name: 'guardrails',
+      version: '1.0.0',
+      orchestration: {
+        pattern: 'parallel',
+        maxAgents: 5,
+        maxIterations: 5,
+        timeoutMs: 60_000,
+        maxEvents: 1,
+      },
+      agents: [
+        { id: 'a', persona: { role: 'A', goal: 'x', backstory: 'x' }, skills: [] },
+      ],
+    } as any);
+
+    await orchestrator.initialize();
+    const events = await collect(orchestrator.run('hello'));
+
+    const done = [...events].reverse().find(e => (e as any).type === 'orchestration_done') as any;
+    expect(done).toBeTruthy();
+    expect(String(done.result)).toMatch(/maxEvents/i);
+  });
+
+  test('per-agent timeout stops slow agents', async () => {
+    const originalRun = ComposedAgent.prototype.run;
+    ComposedAgent.prototype.run = async function* () {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      yield {
+        type: 'done',
+        answer: '[slow] ok',
+        toolCalls: [],
+        iterations: 1,
+      } as any;
+    };
+
+    try {
+      const orchestrator = new AgentOrchestrator({
+        name: 'timeouts',
+        version: '1.0.0',
+        orchestration: {
+          pattern: 'sequential',
+          maxAgents: 5,
+          maxIterations: 5,
+          timeoutMs: 60_000,
+          perAgentTimeoutMs: 10,
+        },
+        agents: [
+          { id: 'slow', persona: { role: 'S', goal: 'x', backstory: 'x' }, skills: [] },
+        ],
+      } as any);
+
+      await orchestrator.initialize();
+      const events = await collect(orchestrator.run('hello'));
+      const done = [...events].reverse().find(e => (e as any).type === 'orchestration_done') as any;
+      expect(done).toBeTruthy();
+      expect(String(done.result)).toMatch(/timed out/i);
+    } finally {
+      ComposedAgent.prototype.run = originalRun;
+    }
+  });
+
+  test('external cancellation stops orchestration', async () => {
+    const originalRun = ComposedAgent.prototype.run;
+    ComposedAgent.prototype.run = async function* () {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      yield {
+        type: 'done',
+        answer: '[slow] ok',
+        toolCalls: [],
+        iterations: 1,
+      } as any;
+    };
+
+    try {
+      const orchestrator = new AgentOrchestrator({
+        name: 'cancel',
+        version: '1.0.0',
+        orchestration: {
+          pattern: 'sequential',
+          maxAgents: 5,
+          maxIterations: 5,
+          timeoutMs: 60_000,
+        },
+        agents: [
+          { id: 'slow', persona: { role: 'S', goal: 'x', backstory: 'x' }, skills: [] },
+        ],
+      } as any);
+
+      await orchestrator.initialize();
+      const controller = new AbortController();
+      const eventsPromise = collect(orchestrator.run('hello', undefined, { signal: controller.signal }));
+      controller.abort('user cancelled');
+      const events = await eventsPromise;
+
+      const done = [...events].reverse().find(e => (e as any).type === 'orchestration_done') as any;
+      expect(done).toBeTruthy();
+      expect(String(done.result)).toMatch(/cancel/i);
+    } finally {
+      ComposedAgent.prototype.run = originalRun;
+    }
   });
 });
