@@ -1,0 +1,53 @@
+# hello-world-sequential.yaml
+# SEQUENTIAL pattern: Agents pass work to each other in a chain
+# Usage: summon orchestrate ./examples/teams/hello-world-sequential.yaml "Create a festive holiday greeting"
+
+name: hello-world-sequential
+version: '1.0.0'
+description: 'Sequential multi-agent greeting - composer → emoji-curator → formatter'
+
+orchestration:
+  pattern: parallel
+  maxAgents: 5
+  maxIterations: 10
+  timeoutMs: 60000
+
+agents:
+  # Step 1: Composer creates the greeting
+  - id: composer
+    persona:
+      role: 'Greeting Composer'
+      goal: 'Write warm personalized greeting messages'
+      backstory: 'You are a creative writer specializing in greetings. Write a warm, personalized greeting based on the request.'
+    skills:
+      - $ref: web-search
+    outputTo: [emoji-curator]  # Passes output to next agent
+
+  # Step 2: Emoji Curator adds emojis to the greeting
+  - id: emoji-curator
+    persona:
+      role: 'Emoji Curator'  
+      goal: 'Add perfect emojis to greeting messages'
+      backstory: |
+        You receive a greeting message from the composer. 
+        Add 2-4 appropriate emojis to enhance it. 
+        Return the ORIGINAL greeting with emojis inserted naturally.
+    skills:
+      - $ref: web-search
+    outputTo: [formatter]  # Passes enhanced greeting to formatter
+
+  # Step 3: Formatter prettifies the final output
+  - id: formatter
+    persona:
+      role: 'Output Formatter'
+      goal: 'Format greetings beautifully with markdown'
+      backstory: |
+        You receive the emoji-enhanced greeting from the emoji-curator.
+        Format it beautifully with markdown, add a header, and make it delightful.
+        This is the final output the user will see.
+    skills:
+      - $ref: web-search
+
+output:
+  format: markdown
+  aggregator: concatenate

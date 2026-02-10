@@ -1,0 +1,94 @@
+# hello-world-v2.yaml
+# Multi-agent hello world demonstrating orchestrator + sub-agents
+# Demonstrates: hierarchical pattern, parallel workers, result aggregation
+# Usage: summon run "Say hello in 3 languages" --ritual ./examples/agents/hello-world-v2.yaml
+
+name: hello-world-v2
+version: 2.0.0
+description: |
+  🎭 Multi-Agent Greeting Orchestrator
+  
+  A coordinator plans greeting components, then delegates to specialist workers:
+  - Composer: Writes the warm greeting message
+  - Emoji Curator: Picks perfect emojis
+  - Translator: Translates to multiple languages
+  - Formatter: Combines everything beautifully
+  
+  Demonstrates: hierarchical orchestration, parallel execution, aggregation
+
+orchestration:
+  pattern: hierarchical
+  maxAgents: 5
+  maxIterations: 15
+  timeoutMs: 60000
+
+agents:
+  # 🎪 Coordinator: Plans and delegates greeting tasks
+  - id: coordinator
+    ritual: summon://examples/agents/financial-analyst.yaml
+
+  # ✍️ Greeting Composer: Writes the main greeting
+  - id: composer
+    persona:
+      role: Greeting Composer
+      goal: Write warm, personalized greeting messages
+      backstory: |
+        You are a creative writer specializing in greetings. Given a context and tone,
+        you compose 1-2 sentences that feel genuine and warm. Keep it concise but memorable.
+      behavior:
+        style: casual
+    skills:
+      - $ref: web-search
+    model:
+      primary: gpt-4o-mini
+      maxIterations: 3
+
+  # 🎨 Emoji Curator: Picks the perfect emojis
+  - id: emoji-curator
+    persona:
+      role: Emoji Curator
+      goal: Select emojis that enhance greeting messages
+      backstory: |
+        You are an emoji expert. Given a greeting context, you select 2-4 emojis 
+        that match the sentiment. Return ONLY the emojis, no explanation.
+      behavior:
+        style: casual
+    skills: []
+    model:
+      primary: gpt-4o-mini
+      maxIterations: 2
+
+  # 🌍 Polyglot Translator: Multi-language translations
+  - id: translator
+    persona:
+      role: Polyglot Translator
+      goal: Translate greetings into multiple languages beautifully
+      backstory: |
+        You translate greetings into requested languages. For each translation,
+        provide: language name, translated text, and a simple pronunciation guide.
+      behavior:
+        style: professional
+    skills:
+      - $ref: web-search
+    model:
+      primary: gpt-4o-mini
+      maxIterations: 5
+
+  # 📐 Formatter: Combines everything beautifully
+  - id: formatter
+    persona:
+      role: Output Formatter
+      goal: Combine all components into a beautiful final greeting
+      backstory: |
+        You take outputs from composer, emoji-curator, and translator, 
+        then format them into a cohesive, delightful markdown response.
+      behavior:
+        style: casual
+    skills: []
+    model:
+      primary: gpt-4o-mini
+      maxIterations: 3
+
+output:
+  format: markdown
+  aggregator: concatenate

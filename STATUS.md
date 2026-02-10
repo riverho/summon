@@ -1,5 +1,45 @@
 # Status
 
+Milestone 4 - CLI `parallel` Command (DONE)
+
+Changed
+- Added shared orchestration runner helper in CLI to centralize persistence, event streaming, and output behavior.
+- Added `summon parallel <query> --agents a.yaml,b.yaml [--model ...]` as an ad-hoc orchestration shortcut.
+- `parallel` now generates an in-memory team config with `orchestration.pattern: parallel` and runs through `AgentOrchestrator`.
+- Added safe auto-generated agent IDs from ritual filenames, including de-duplication when names collide.
+
+Files touched
+- src/cli/index.ts
+- STATUS.md
+
+Commands to run
+- bun run typecheck
+
+Milestone 5 - CLI `teams` Command Group (DONE)
+
+Changed
+- Added `summon teams` command group for example-team discovery and execution.
+- Added `summon teams list` to enumerate YAML files in `examples/teams/`.
+- Added `summon teams run <team-name> "query"` that resolves team names to YAML files and runs via orchestrator.
+- Reused shared CLI orchestration runner for consistent session persistence and output behavior.
+
+Files touched
+- src/cli/index.ts
+- STATUS.md
+
+Commands to run
+- bun run typecheck
+
+Milestone 6 - Delivery Docs (DONE)
+
+Changed
+- Added `IMPLEMENTATION_PLAN.md` describing design, command behavior, and validation strategy for `parallel` and `teams`.
+- Updated status checkpoints after each implementation milestone.
+
+Files touched
+- IMPLEMENTATION_PLAN.md
+- STATUS.md
+
 Milestone 1 - Orchestrator DAG + Events (DONE)
 
 Changed

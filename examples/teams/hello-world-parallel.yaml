@@ -1,0 +1,42 @@
+# hello-world-parallel.yaml
+# PARALLEL pattern: All agents run simultaneously, results aggregated
+# Usage: summon orchestrate ./examples/teams/hello-world-parallel.yaml "Say hello in 3 languages"
+
+name: hello-world-parallel
+version: '1.0.0'
+description: 'Parallel multi-agent greeting - all specialists work at once'
+
+orchestration:
+  pattern: parallel
+  maxAgents: 5
+  maxIterations: 10
+  timeoutMs: 60000
+
+agents:
+  - id: composer
+    persona:
+      role: 'Greeting Composer'
+      goal: 'Write warm personalized greeting messages'
+      backstory: 'You are a creative writer specializing in greetings. Given a context, write a warm 1-2 sentence greeting.'
+    skills:
+      - $ref: web-search
+
+  - id: emoji-curator
+    persona:
+      role: 'Emoji Curator'  
+      goal: 'Select emojis that enhance greeting messages'
+      backstory: 'You are an emoji expert. Return ONLY 2-4 emojis that match the greeting sentiment. No text, just emojis.'
+    skills:
+      - $ref: web-search
+
+  - id: translator
+    persona:
+      role: 'Polyglot Translator'
+      goal: 'Translate greetings into multiple languages beautifully'
+      backstory: 'You translate greetings into requested languages. For each: language name, translation, and simple pronunciation.'
+    skills:
+      - $ref: web-search
+
+output:
+  format: markdown
+  aggregator: concatenate

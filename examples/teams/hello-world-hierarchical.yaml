@@ -1,0 +1,81 @@
+# hello-world-hierarchical.yaml
+# HIERARCHICAL pattern: Coordinator plans, workers execute in parallel
+# Usage: summon orchestrate ./examples/teams/hello-world-hierarchical.yaml "Create an epic greeting for a space enthusiast"
+
+name: hello-world-hierarchical
+version: '1.0.0'
+description: 'Hierarchical multi-agent greeting - coordinator plans, workers execute'
+
+orchestration:
+  pattern: hierarchical
+  maxAgents: 5
+  maxIterations: 10
+  timeoutMs: 90000
+  perAgentTimeoutMs: 60000
+  # Override for testing - bypass coordinator parsing
+  coordinatorPlanOverride:
+    run: ["composer", "emoji-curator", "translator"]
+    pattern: "parallel"
+    final: "formatter"
+    handoffs: []
+
+agents:
+  # Coordinator: First agent is the coordinator
+  - id: coordinator
+    persona:
+      role: 'Master Coordinator'
+      goal: 'Plan and coordinate multi-agent greeting creation'
+      backstory: |
+        You are the coordinator. Analyze the request and output a JSON plan.
+    skills:
+      - $ref: web-search
+    model:
+      primary: gpt-4o-mini
+      maxIterations: 3
+
+  # Workers: Execute the plan in parallel
+  - id: composer
+    persona:
+      role: 'Greeting Composer'
+      goal: 'Create warm, creative greetings'
+      backstory: |
+        You are a specialist greeting composer. Create warm, creative greetings.
+        Focus on making it memorable and personalized.
+    skills:
+      - $ref: web-search
+
+  - id: emoji-curator
+    persona:
+      role: 'Emoji Curator'
+      goal: 'Select perfect emojis for greetings'
+      backstory: |
+        You are an emoji expert. Select 2-4 emojis that match the greeting theme.
+        Return ONLY the emojis, no explanation.
+    skills:
+      - $ref: web-search
+
+  - id: translator
+    persona:
+      role: 'Polyglot Translator'
+      goal: 'Translate greetings into multiple languages'
+      backstory: |
+        You are a specialist translator. Provide translations with pronunciation guides.
+        Format as a markdown table.
+    skills:
+      - $ref: web-search
+
+  # Final formatter assembles everything
+  - id: formatter
+    persona:
+      role: 'Assembly Formatter'
+      goal: 'Combine all worker outputs into final greeting'
+      backstory: |
+        You are the final assembler. You receive outputs from all workers.
+        Combine them into one cohesive, beautifully formatted greeting.
+        Add a header and make it presentation-ready.
+    skills:
+      - $ref: web-search
+
+output:
+  format: markdown
+  aggregator: concatenate
