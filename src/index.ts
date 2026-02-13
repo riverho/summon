@@ -180,3 +180,21 @@ export type {
   Checkpoint,
   IDEType,
 } from './durable/index.js';
+
+// Observability (AO Stress Test #2)
+export {
+  MetricsCollector,
+  getMetricsCollector,
+  Dashboard,
+} from './observability/index.js';
+
+export type {
+  RitualMetrics,
+  TaskMetrics,
+  RoutingDecision,
+  CheckpointEvent,
+  RoutingAccuracyReport,
+  DailySummary,
+} from './observability/index.js';
+
+export type { WeeklyReport } from './observability/dashboard.js';

@@ -978,6 +978,111 @@ ritualCmd
   });
 
 // ============================================================================
+// Observability Commands — See First, Automate Second
+// ============================================================================
+
+import { getMetricsCollector, Dashboard } from '../observability/index.js';
+
+const obsCmd = program
+  .command('observability')
+  .alias('obs')
+  .description('Ritual observability — metrics, costs, and routing analysis');
+
+obsCmd
+  .command('dashboard')
+  .description('Show real-time observability dashboard')
+  .option('--html <path>', 'Export to HTML file')
+  .action((options: { html?: string }) => {
+    const collector = getMetricsCollector();
+    const dashboard = new Dashboard(collector, './');
+    
+    if (options.html) {
+      const path = dashboard.saveHtml(options.html);
+      console.log(`Dashboard exported to: ${path}`);
+    } else {
+      console.log(dashboard.renderRealtime());
+    }
+  });
+
+obsCmd
+  .command('ritual <ritualId>')
+  .description('Show detailed metrics for a ritual')
+  .action((ritualId: string) => {
+    const collector = getMetricsCollector();
+    const dashboard = new Dashboard(collector, './');
+    console.log(dashboard.renderRitualDetail(ritualId));
+  });
+
+obsCmd
+  .command('summary [date]')
+  .description('Show daily summary (YYYY-MM-DD, default: today)')
+  .option('--json', 'Output in JSON format')
+  .action((date: string | undefined, options: { json?: boolean }) => {
+    const collector = getMetricsCollector();
+    const summary = collector.getDailySummary(date);
+    
+    if (options.json) {
+      console.log(JSON.stringify(summary, null, 2));
+    } else {
+      console.log(`\n📊 Daily Summary: ${summary.date}`);
+      console.log(`   Rituals: ${summary.completedRituals} completed │ ${summary.failedRituals} failed`);
+      console.log(`   Tasks:   ${summary.totalTasks}`);
+      console.log(`   Tokens:  ${summary.totalTokens.toLocaleString()}`);
+      console.log(`   Cost:    $${summary.totalCost.toFixed(4)}`);
+      console.log(`   Avg Duration: ${(summary.avgRitualDuration / 1000).toFixed(1)}s`);
+      console.log(`\n   Routing Accuracy: ${(summary.routingAccuracy.accuracyRate * 100).toFixed(1)}%`);
+      if (summary.routingAccuracy.wastedCost > 0) {
+        console.log(`   Wasted Cost: $${summary.routingAccuracy.wastedCost.toFixed(4)}`);
+      }
+      if (summary.routingAccuracy.recommendations.length > 0) {
+        console.log(`\n   💡 Recommendations:`);
+        summary.routingAccuracy.recommendations.forEach(r => console.log(`      • ${r}`));
+      }
+    }
+  });
+
+obsCmd
+  .command('routing')
+  .description('Analyze routing accuracy and get recommendations')
+  .action(() => {
+    const collector = getMetricsCollector();
+    const report = collector.analyzeRoutingAccuracy();
+    
+    console.log('\n🎯 Routing Accuracy Analysis');
+    console.log(`   Total Decisions: ${report.total}`);
+    console.log(`   Correct: ${report.correct} (${(report.accuracyRate * 100).toFixed(1)}%)`);
+    console.log(`   Overkill: ${report.overkill} (wasted $${report.wastedCost.toFixed(4)})`);
+    console.log(`   Underpowered: ${report.underpowered}`);
+    
+    if (report.recommendations.length > 0) {
+      console.log('\n   💡 Recommendations:');
+      report.recommendations.forEach(r => console.log(`      • ${r}`));
+    }
+  });
+
+obsCmd
+  .command('weekly')
+  .description('Show 7-day summary report')
+  .action(() => {
+    const collector = getMetricsCollector();
+    const dashboard = new Dashboard(collector, './');
+    const report = dashboard.generateWeeklyReport();
+    
+    console.log('\n📈 7-Day Report');
+    console.log(`   Days: ${report.days}`);
+    console.log(`   Total Rituals: ${report.totalRituals}`);
+    console.log(`   Total Cost: $${report.totalCost.toFixed(4)}`);
+    console.log(`   Total Tokens: ${report.totalTokens.toLocaleString()}`);
+    console.log(`   Avg Daily: $${report.avgDailyCost.toFixed(4)}`);
+    console.log(`   Trend: ${report.costTrend}`);
+    
+    if (report.recommendations.length > 0) {
+      console.log('\n   💡 Recommendations:');
+      report.recommendations.forEach(r => console.log(`      • ${r}`));
+    }
+  });
+
+// ============================================================================
 // Parse
 // ============================================================================
 
