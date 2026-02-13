@@ -140,10 +140,12 @@ export class GuardrailValidator {
   ): Promise<{ success: boolean; error?: GuardrailError; attempts: number; transformedValue?: unknown }> {
     const policy = { ...DefaultRetryPolicy, ...guardrail.retryPolicy };
     let attempts = 0;
+    let lastResult: { success: boolean; error?: GuardrailError; transformedValue?: unknown } | null = null;
 
     while (attempts < policy.maxAttempts) {
       attempts++;
       const result = await this.runValidation(guardrail, value);
+      lastResult = result;
 
       if (result.success) {
         return { success: true, attempts, transformedValue: result.transformedValue };
@@ -156,9 +158,13 @@ export class GuardrailValidator {
       }
     }
 
+    // Return the actual error from the last attempt, with retry info
     return {
       success: false,
-      error: {
+      error: lastResult?.error ? {
+        ...lastResult.error,
+        message: `${lastResult.error.message} (failed after ${attempts} attempts)`,
+      } : {
         guardrailId: guardrail.id,
         type: guardrail.type,
         message: `Validation failed after ${attempts} attempts`,

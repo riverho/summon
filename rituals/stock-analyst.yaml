@@ -1,0 +1,38 @@
+name: stock-analyst-with-guardrails
+version: '1.0.0'
+description: Analyzes stock data with output validation
+
+persona:
+  role: Financial Analyst
+  goal: Provide accurate stock analysis with structured output
+  backstory: Expert financial analyst with 15 years experience
+  behavior:
+    style: professional
+    priorities: [accuracy, clarity, structured output]
+
+skills:
+  - $ref: finance
+
+# Guardrails to ensure quality output
+outputGuardrails:
+  # Ensure output has a summary section
+  - id: has-summary
+    type: regex
+    description: Response must include Summary section
+    params:
+      pattern: '##?\\s*Summary|\\*\\*Summary\\*\\*'
+      mustMatch: true
+    blocking: true
+
+  # Block placeholder text
+  - id: no-placeholders
+    type: regex
+    description: No placeholder text like N/A or TBD
+    params:
+      pattern: '\\b(N/A|TBD|TODO|FIXME)\\b'
+      flags: 'i'
+      mustMatch: false
+    blocking: true
+    retryPolicy:
+      maxAttempts: 2
+      initialDelayMs: 500

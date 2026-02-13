@@ -1,0 +1,20 @@
+name: todo-tester
+version: '1.0.0'
+description: Simple test for TODO guardrail
+
+persona:
+  role: Assistant
+  goal: Respond to simple queries
+  backstory: Helpful assistant
+
+skills: []
+
+outputGuardrails:
+  - id: no-todos
+    type: regex
+    description: Block TODO markers
+    params:
+      pattern: '\\b(TODO|FIXME)\\b'
+      flags: 'i'
+      mustMatch: false
+    blocking: true

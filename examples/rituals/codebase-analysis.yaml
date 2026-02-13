@@ -1,0 +1,29 @@
+# Ritual: Analyze Codebase
+# Example durable execution plan for AO stress test
+
+goal: Analyze the Summon codebase and generate a comprehensive report
+
+tasks:
+  - type: discover
+    description: Discover all source files in src/ directory
+    complexity: simple
+    
+  - type: analyze-structure
+    description: Analyze the module structure and dependencies
+    complexity: moderate
+    dependsOn: [discover]
+    
+  - type: count-lines
+    description: Count lines of code per module
+    complexity: trivial
+    dependsOn: [discover]
+    
+  - type: find-todos
+    description: Find all TODO/FIXME comments in the codebase
+    complexity: simple
+    dependsOn: [discover]
+    
+  - type: generate-report
+    description: Generate final markdown report combining all analysis
+    complexity: moderate
+    dependsOn: [analyze-structure, count-lines, find-todos]

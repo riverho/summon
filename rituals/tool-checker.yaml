@@ -1,0 +1,13 @@
+name: tool-checker
+version: '1.0.0'
+description: Check available tools
+
+persona:
+  role: Assistant
+  goal: List available tools
+  backstory: Helpful assistant
+
+skills:
+  - $ref: finance
+
+outputGuardrails: []

@@ -197,18 +197,6 @@ export class ComposedAgent {
    * Run the agent and yield events for real-time UI updates
    */
   async *run(query: string, inMemoryHistory?: InMemoryChatHistory, sessionId?: string): AsyncGenerator<AgentEvent> {
-    if (this.spec.tools.length === 0) {
-      const event = {
-        type: 'done' as const,
-        answer: `[${this.spec.name}] No tools available. Please check your skill configuration and tool registry.`,
-        toolCalls: [],
-        iterations: 0,
-      };
-      this.lastEvent = event;
-      yield event;
-      return;
-    }
-
     const session = new Session(query, { sessionId });
     let currentPrompt = this.buildInitialPrompt(query, inMemoryHistory);
     let iteration = 0;
@@ -229,13 +217,64 @@ export class ComposedAgent {
 
       // No tool calls = ready to generate final answer
       if (!hasToolCalls(response)) {
-        // If no tools were called at all, just use the direct response
+        // If no tools were called at all, validate and return direct response
         if (!session.hasToolResults() && responseText) {
           const event = { type: 'answer_start' as const };
           this.lastEvent = event;
           yield event;
-          const prefixedAnswer = `[${this.spec.name}] ${responseText}`;
-          const doneEvent = { type: 'done' as const, answer: prefixedAnswer, toolCalls: [], iterations: iteration };
+
+          // Run guardrails validation if configured
+          let finalAnswer = responseText;
+          if (this.spec.outputGuardrails && this.spec.outputGuardrails.length > 0) {
+            const validator = new GuardrailValidator();
+            validator.addGuardrails(this.spec.outputGuardrails);
+
+            let result = await validator.validate(finalAnswer);
+            let attempts = 1;
+
+            // Retry loop for guardrail failures
+            while (!result.success && attempts < 3) {
+              yield {
+                type: 'guardrail_check' as const,
+                passed: false,
+                attemptCount: attempts,
+                errors: result.errors.map(e => `[${e.guardrailId}] ${e.message}`),
+              };
+
+              await sleep(1000 * Math.pow(2, attempts - 1));
+
+              const errorContext = result.errors.map(e => `[${e.guardrailId}] ${e.message}`).join('\n');
+              const retryPrompt = `${currentPrompt}\n\n=== VALIDATION ERRORS ===\nThe previous response failed validation:\n${errorContext}\n\nPlease fix these issues and provide a corrected response.`;
+
+              const retryResponse = await this.callModel(retryPrompt, false);
+              finalAnswer = typeof retryResponse === 'string' ? retryResponse : extractTextContent(retryResponse);
+
+              attempts++;
+              result = await validator.validate(finalAnswer);
+            }
+
+            yield {
+              type: 'guardrail_check' as const,
+              passed: result.success,
+              attemptCount: attempts,
+              errors: result.errors.map(e => `[${e.guardrailId}] ${e.message}`),
+            };
+
+            if (!result.success) {
+              const blockingErrors = result.errors.filter(e => e.blocking);
+              if (blockingErrors.length > 0) {
+                yield {
+                  type: 'guardrail_failed' as const,
+                  answer: finalAnswer,
+                  errors: blockingErrors.map(e => `[${e.guardrailId}] ${e.message}`),
+                };
+                finalAnswer = `[GUARDRAIL FAILED] ${blockingErrors.map(e => e.message).join('; ')}`;
+              }
+            }
+          }
+
+          const prefixedAnswer = `[${this.spec.name}] ${finalAnswer}`;
+          const doneEvent = { type: 'done' as const, answer: prefixedAnswer, toolCalls: [], iterations: iteration, guardrailFailed: finalAnswer.startsWith('[GUARDRAIL FAILED]') };
           this.lastEvent = doneEvent;
           yield doneEvent;
           return;

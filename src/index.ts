@@ -155,3 +155,28 @@ export * from './orchestration/types.js';
 
 // Storage
 export * from './storage/index.js';
+
+// Durable Execution Engine (AO Port)
+export {
+  RitualEngine,
+  createRitualEngine,
+} from './durable/ritual-engine.js';
+
+export {
+  AgentPool,
+  ContextManager,
+  CheckpointManager,
+} from './durable/index.js';
+
+export type {
+  Ritual,
+  RitualTask,
+  RitualPlan,
+  RitualOptions,
+  MicroTask,
+  TaskComplexity,
+  SubAgentResult,
+  StateMutation,
+  Checkpoint,
+  IDEType,
+} from './durable/index.js';

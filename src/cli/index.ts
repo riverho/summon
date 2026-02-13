@@ -813,6 +813,171 @@ const mcpCommand = createMCPCommands();
 program.addCommand(mcpCommand);
 
 // ============================================================================
+// Ritual Commands — Durable Execution Engine
+// ============================================================================
+
+import { createRitualEngine, RitualPlan } from '../durable/ritual-engine.js';
+
+const ritualCmd = program
+  .command('ritual')
+  .description('Durable execution rituals with ephemeral sub-agents');
+
+ritualCmd
+  .command('start <goal>')
+  .description('Start a new ritual with a goal')
+  .option('-p, --plan <yaml>', 'Path to ritual plan YAML')
+  .option('--json', 'Output in JSON format')
+  .action(async (goal: string, options: { plan?: string; json?: boolean }) => {
+    const engine = createRitualEngine();
+    
+    let plan: RitualPlan | undefined;
+    if (options.plan) {
+      const planYaml = readFileSync(options.plan, 'utf-8');
+      plan = parseYaml(planYaml) as RitualPlan;
+    }
+    
+    const ritual = await engine.createRitual(goal, plan);
+    
+    if (options.json) {
+      console.log(JSON.stringify({ ritualId: ritual.id, goal, state: ritual.state }, null, 2));
+    } else {
+      console.log(`🔥 Ritual created: ${ritual.id}`);
+      console.log(`   Goal: ${goal}`);
+      console.log(`   Tasks: ${ritual.tasks.length}`);
+      console.log(`   Starting execution...\n`);
+    }
+    
+    // Start execution
+    await engine.startRitual(ritual.id);
+    
+    const stats = engine.getRitualStats(ritual.id);
+    
+    if (options.json) {
+      console.log(JSON.stringify({
+        ritualId: ritual.id,
+        state: ritual.state,
+        stats,
+        tokensUsed: ritual.metadata.totalTokensUsed,
+        estimatedCost: ritual.metadata.estimatedCost.toFixed(4)
+      }, null, 2));
+    } else {
+      console.log(`\n✓ Ritual complete: ${ritual.id}`);
+      console.log(`  State: ${ritual.state}`);
+      if (stats) {
+        console.log(`  Progress: ${stats.completed}/${stats.totalTasks} tasks`);
+      }
+      console.log(`  Tokens: ${ritual.metadata.totalTokensUsed}`);
+      console.log(`  Est. cost: $${ritual.metadata.estimatedCost.toFixed(4)}`);
+    }
+  });
+
+ritualCmd
+  .command('list')
+  .description('List active rituals')
+  .option('--json', 'Output in JSON format')
+  .action((options: { json?: boolean }) => {
+    const engine = createRitualEngine();
+    const rituals = engine.listRituals();
+    
+    if (options.json) {
+      console.log(JSON.stringify(rituals.map(r => ({
+        id: r.id,
+        goal: r.goal,
+        state: r.state,
+        tasks: r.tasks.length,
+        createdAt: r.metadata.createdAt
+      })), null, 2));
+    } else {
+      console.log('Active Rituals:\n');
+      for (const ritual of rituals) {
+        const stats = engine.getRitualStats(ritual.id);
+        console.log(`  ${ritual.id.slice(0, 20)}...`);
+        console.log(`    Goal: ${ritual.goal.slice(0, 50)}${ritual.goal.length > 50 ? '...' : ''}`);
+        console.log(`    State: ${ritual.state}`);
+        if (stats) {
+          console.log(`    Progress: ${Math.round(stats.progress * 100)}% (${stats.completed}/${stats.totalTasks})`);
+        }
+        console.log('');
+      }
+    }
+  });
+
+ritualCmd
+  .command('status <ritualId>')
+  .description('Get ritual status and progress')
+  .option('--json', 'Output in JSON format')
+  .action((ritualId: string, options: { json?: boolean }) => {
+    const engine = createRitualEngine();
+    const ritual = engine.getRitual(ritualId);
+    
+    if (!ritual) {
+      console.error(`Ritual not found: ${ritualId}`);
+      process.exit(1);
+    }
+    
+    const stats = engine.getRitualStats(ritualId);
+    
+    if (options.json) {
+      console.log(JSON.stringify({
+        id: ritual.id,
+        goal: ritual.goal,
+        state: ritual.state,
+        stats,
+        tasks: ritual.tasks.map(t => ({
+          id: t.id,
+          type: t.type,
+          status: t.status,
+          agentId: t.agentId
+        })),
+        metadata: ritual.metadata
+      }, null, 2));
+    } else {
+      console.log(`Ritual: ${ritual.id}`);
+      console.log(`Goal: ${ritual.goal}`);
+      console.log(`State: ${ritual.state}`);
+      console.log(`\nTasks:`);
+      for (const task of ritual.tasks) {
+        const icon = task.status === 'completed' ? '✓' : task.status === 'failed' ? '✗' : task.status === 'running' ? '⟳' : '○';
+        console.log(`  ${icon} [${task.type}] ${task.description.slice(0, 40)}${task.description.length > 40 ? '...' : ''}`);
+        if (task.agentId) {
+          console.log(`      Agent: ${task.agentId} | Session: ${task.sessionId?.slice(0, 16)}...`);
+        }
+      }
+      if (stats) {
+        console.log(`\nProgress: ${Math.round(stats.progress * 100)}% (${stats.completed}/${stats.totalTasks})`);
+      }
+      console.log(`\nTokens: ${ritual.metadata.totalTokensUsed}`);
+      console.log(`Est. Cost: $${ritual.metadata.estimatedCost.toFixed(4)}`);
+    }
+  });
+
+ritualCmd
+  .command('resume <ritualId>')
+  .description('Resume a ritual from checkpoint')
+  .option('--json', 'Output in JSON format')
+  .action(async (ritualId: string, options: { json?: boolean }) => {
+    const engine = createRitualEngine();
+    
+    if (!options.json) {
+      console.log(`Resuming ritual: ${ritualId}...`);
+    }
+    
+    await engine.resumeRitual(ritualId);
+    
+    const ritual = engine.getRitual(ritualId);
+    const stats = engine.getRitualStats(ritualId);
+    
+    if (options.json) {
+      console.log(JSON.stringify({ ritualId, state: ritual?.state, stats }, null, 2));
+    } else {
+      console.log(`✓ Ritual resumed: ${ritualId}`);
+      if (stats) {
+        console.log(`  Progress: ${Math.round(stats.progress * 100)}%`);
+      }
+    }
+  });
+
+// ============================================================================
 // Parse
 // ============================================================================
 
