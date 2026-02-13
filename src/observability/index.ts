@@ -8,5 +8,7 @@ export type {
   CheckpointEvent,
   RoutingAccuracyReport,
   DailySummary,
+  SubAgentLifecycleEvent,
+  SubAgentPoolStats,
 } from './collector.js';
 export type { WeeklyReport } from './dashboard.js';

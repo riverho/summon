@@ -50,9 +50,14 @@ const DEFAULT_CAPABILITIES: Record<IDEType, AgentCapabilities> = {
 export class AgentPool {
   private agentCounter = 0;
   private onRoutingDecision?: (decision: { taskId: string; complexity: TaskComplexity; routedTo: IDEType; reason: string }) => void;
+  private onSubAgentEvent?: (event: { type: 'spawned' | 'completed' | 'failed'; ritualId: string; taskId: string; agentType: IDEType; sessionId?: string; durationMs?: number; tokensUsed?: number; errorCode?: string }) => void;
   
-  constructor(options?: { onRoutingDecision?: (decision: { taskId: string; complexity: TaskComplexity; routedTo: IDEType; reason: string }) => void }) {
+  constructor(options?: { 
+    onRoutingDecision?: (decision: { taskId: string; complexity: TaskComplexity; routedTo: IDEType; reason: string }) => void;
+    onSubAgentEvent?: (event: { type: 'spawned' | 'completed' | 'failed'; ritualId: string; taskId: string; agentType: IDEType; sessionId?: string; durationMs?: number; tokensUsed?: number; errorCode?: string }) => void;
+  }) {
     this.onRoutingDecision = options?.onRoutingDecision;
+    this.onSubAgentEvent = options?.onSubAgentEvent;
   }
   
   /**
@@ -104,9 +109,36 @@ export class AgentPool {
       });
     }
     
+    // Emit spawned event
+    if (this.onSubAgentEvent && taskId) {
+      this.onSubAgentEvent({
+        type: 'spawned',
+        ritualId,
+        taskId,
+        agentType: ideType,
+        sessionId: `session-${agentId}`
+      });
+    }
+    
     // For now, simulate sub-agent execution
     // In production, this would use sessions_spawn
     await new Promise(r => setTimeout(r, 100)); // Simulate spawn delay
+    
+    const durationMs = Date.now() - startTime;
+    const tokensUsed = Math.floor(Math.random() * 2000) + 500;
+    
+    // Emit completed event
+    if (this.onSubAgentEvent && taskId) {
+      this.onSubAgentEvent({
+        type: 'completed',
+        ritualId,
+        taskId,
+        agentType: ideType,
+        sessionId: `session-${agentId}`,
+        durationMs,
+        tokensUsed
+      });
+    }
     
     return {
       success: true,
@@ -115,8 +147,8 @@ export class AgentPool {
       metrics: {
         startTime,
         endTime: Date.now(),
-        durationMs: Date.now() - startTime,
-        tokensUsed: Math.floor(Math.random() * 2000) + 500
+        durationMs,
+        tokensUsed
       },
       sessionId: `session-${agentId}`,
       agentType: ideType

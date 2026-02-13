@@ -195,6 +195,8 @@ export type {
   CheckpointEvent,
   RoutingAccuracyReport,
   DailySummary,
+  SubAgentLifecycleEvent,
+  SubAgentPoolStats,
 } from './observability/index.js';
 
 export type { WeeklyReport } from './observability/dashboard.js';

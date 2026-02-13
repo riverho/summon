@@ -40,6 +40,13 @@ export interface RitualMetrics {
   // Checkpoint stats
   checkpointsCreated: number;
   recoveryCount: number;
+  
+  // Sub-agent lifecycle (NEW)
+  subAgentsSpawned: number;
+  subAgentsCompleted: number;
+  subAgentsFailed: number;
+  subAgentsRetried: number;
+  totalRetries: number;
 }
 
 export interface TaskMetrics {
@@ -98,6 +105,39 @@ export interface CheckpointEvent {
 }
 
 // ============================================================================
+// Sub-Agent Lifecycle Events (NEW)
+// ============================================================================
+
+export interface SubAgentLifecycleEvent {
+  timestamp: number;
+  ritualId: string;
+  taskId: string;
+  agentType: IDEType;
+  event: 'spawned' | 'completed' | 'failed' | 'retry';
+  sessionId?: string;
+  errorCode?: string;
+  retryCount: number;
+  durationMs?: number;
+  tokensUsed?: number;
+}
+
+export interface SubAgentPoolStats {
+  activeAgents: number;
+  idleAgents: number;
+  queuedTasks: number;
+  totalSpawned: number;
+  totalCompleted: number;
+  totalFailed: number;
+  totalRetries: number;
+  byAgentType: Record<IDEType, {
+    spawned: number;
+    completed: number;
+    failed: number;
+    avgDurationMs: number;
+  }>;
+}
+
+// ============================================================================
 // Metrics Collector
 // ============================================================================
 
@@ -106,6 +146,7 @@ export class MetricsCollector {
   private taskMetrics: TaskMetrics[] = [];
   private routingDecisions: RoutingDecision[] = [];
   private checkpointEvents: CheckpointEvent[] = [];
+  private subAgentEvents: SubAgentLifecycleEvent[] = [];
   private outputDir: string;
   
   constructor(outputDir: string) {
@@ -142,7 +183,13 @@ export class MetricsCollector {
       minTaskDurationMs: Infinity,
       checkpointsCreated: 0,
       recoveryCount: 0,
-      durationMs: 0
+      durationMs: 0,
+      // Sub-agent lifecycle (NEW)
+      subAgentsSpawned: 0,
+      subAgentsCompleted: 0,
+      subAgentsFailed: 0,
+      subAgentsRetried: 0,
+      totalRetries: 0
     });
   }
   
@@ -317,6 +364,126 @@ export class MetricsCollector {
   }
   
   // ========================================================================
+  // Sub-Agent Lifecycle Events (NEW)
+  // ========================================================================
+  
+  recordSubAgentSpawned(ritualId: string, taskId: string, agentType: IDEType, sessionId: string): void {
+    this.subAgentEvents.push({
+      timestamp: Date.now(),
+      ritualId,
+      taskId,
+      agentType,
+      event: 'spawned',
+      sessionId,
+      retryCount: 0
+    });
+    
+    const metrics = this.ritualMetrics.get(ritualId);
+    if (metrics) {
+      metrics.subAgentsSpawned = (metrics.subAgentsSpawned || 0) + 1;
+    }
+  }
+  
+  recordSubAgentCompleted(ritualId: string, taskId: string, agentType: IDEType, durationMs: number, tokensUsed: number): void {
+    this.subAgentEvents.push({
+      timestamp: Date.now(),
+      ritualId,
+      taskId,
+      agentType,
+      event: 'completed',
+      retryCount: 0,
+      durationMs,
+      tokensUsed
+    });
+    
+    const metrics = this.ritualMetrics.get(ritualId);
+    if (metrics) {
+      metrics.subAgentsCompleted = (metrics.subAgentsCompleted || 0) + 1;
+    }
+  }
+  
+  recordSubAgentFailed(ritualId: string, taskId: string, agentType: IDEType, errorCode: string, retryCount: number): void {
+    this.subAgentEvents.push({
+      timestamp: Date.now(),
+      ritualId,
+      taskId,
+      agentType,
+      event: 'failed',
+      errorCode,
+      retryCount
+    });
+    
+    const metrics = this.ritualMetrics.get(ritualId);
+    if (metrics) {
+      metrics.subAgentsFailed = (metrics.subAgentsFailed || 0) + 1;
+    }
+  }
+  
+  recordSubAgentRetry(ritualId: string, taskId: string, agentType: IDEType, retryCount: number): void {
+    this.subAgentEvents.push({
+      timestamp: Date.now(),
+      ritualId,
+      taskId,
+      agentType,
+      event: 'retry',
+      retryCount
+    });
+    
+    const metrics = this.ritualMetrics.get(ritualId);
+    if (metrics) {
+      metrics.subAgentsRetried = (metrics.subAgentsRetried || 0) + 1;
+      metrics.totalRetries = (metrics.totalRetries || 0) + 1;
+    }
+  }
+  
+  getSubAgentStats(ritualId?: string): SubAgentPoolStats {
+    const events = ritualId 
+      ? this.subAgentEvents.filter(e => e.ritualId === ritualId)
+      : this.subAgentEvents;
+    
+    const spawned = events.filter(e => e.event === 'spawned');
+    const completed = events.filter(e => e.event === 'completed');
+    const failed = events.filter(e => e.event === 'failed');
+    
+    const byAgentType: SubAgentPoolStats['byAgentType'] = {
+      claude: { spawned: 0, completed: 0, failed: 0, avgDurationMs: 0 },
+      codex: { spawned: 0, completed: 0, failed: 0, avgDurationMs: 0 },
+      kimi: { spawned: 0, completed: 0, failed: 0, avgDurationMs: 0 },
+      opencode: { spawned: 0, completed: 0, failed: 0, avgDurationMs: 0 }
+    };
+    
+    for (const agent of ['claude', 'codex', 'kimi', 'opencode'] as IDEType[]) {
+      const agentEvents = events.filter(e => e.agentType === agent);
+      const agentSpawned = agentEvents.filter(e => e.event === 'spawned').length;
+      const agentCompleted = agentEvents.filter(e => e.event === 'completed').length;
+      const agentFailed = agentEvents.filter(e => e.event === 'failed').length;
+      const agentDurations = agentEvents
+        .filter(e => e.event === 'completed' && e.durationMs)
+        .map(e => e.durationMs!);
+      
+      byAgentType[agent] = {
+        spawned: agentSpawned,
+        completed: agentCompleted,
+        failed: agentFailed,
+        avgDurationMs: agentDurations.length > 0 
+          ? agentDurations.reduce((a, b) => a + b, 0) / agentDurations.length 
+          : 0
+      };
+    }
+    
+    return {
+      activeAgents: spawned.length - completed.length - failed.length,
+      idleAgents: 0, // Would need pool state
+      queuedTasks: 0, // Would need queue state
+      totalSpawned: spawned.length,
+      totalCompleted: completed.length,
+      totalFailed: failed.length,
+      totalRetries: events.filter(e => e.event === 'retry').length,
+      byAgentType
+    };
+  }
+  
+  // ========================================================================
   // Persistence
   // ========================================================================
   
@@ -329,7 +496,8 @@ export class MetricsCollector {
       rituals: Array.from(this.ritualMetrics.values()),
       tasks: this.taskMetrics,
       routing: this.routingDecisions,
-      checkpoints: this.checkpointEvents
+      checkpoints: this.checkpointEvents,
+      subAgents: this.subAgentEvents
     };
     
     fs.writeFileSync(dailyFile, JSON.stringify(data, null, 2));
@@ -347,6 +515,7 @@ export class MetricsCollector {
     this.taskMetrics = data.tasks || [];
     this.routingDecisions = data.routing || [];
     this.checkpointEvents = data.checkpoints || [];
+    this.subAgentEvents = data.subAgents || [];
   }
   
   // ========================================================================

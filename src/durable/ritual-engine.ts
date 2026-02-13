@@ -105,6 +105,15 @@ export class RitualEngine {
           reason: decision.reason,
           estimatedCost: this.calculateEstimatedCost(decision.routedTo, decision.complexity.estimatedTokens)
         });
+      },
+      onSubAgentEvent: (event) => {
+        if (event.type === 'spawned') {
+          this.metricsCollector.recordSubAgentSpawned(event.ritualId, event.taskId, event.agentType, event.sessionId!);
+        } else if (event.type === 'completed') {
+          this.metricsCollector.recordSubAgentCompleted(event.ritualId, event.taskId, event.agentType, event.durationMs!, event.tokensUsed!);
+        } else if (event.type === 'failed') {
+          this.metricsCollector.recordSubAgentFailed(event.ritualId, event.taskId, event.agentType, event.errorCode!, 0);
+        }
       }
     });
     this.checkpointManager = new CheckpointManager(this.options.checkpointDir);
