@@ -49,6 +49,11 @@ const DEFAULT_CAPABILITIES: Record<IDEType, AgentCapabilities> = {
 
 export class AgentPool {
   private agentCounter = 0;
+  private onRoutingDecision?: (decision: { taskId: string; complexity: TaskComplexity; routedTo: IDEType; reason: string }) => void;
+  
+  constructor(options?: { onRoutingDecision?: (decision: { taskId: string; complexity: TaskComplexity; routedTo: IDEType; reason: string }) => void }) {
+    this.onRoutingDecision = options?.onRoutingDecision;
+  }
   
   /**
    * Route task to appropriate IDE based on complexity and tools
@@ -82,11 +87,22 @@ export class AgentPool {
   async spawnSubAgent<TInput, TOutput>(
     task: MicroTask<TInput, TOutput>,
     complexity: TaskComplexity,
-    ritualId: string
+    ritualId: string,
+    taskId?: string
   ): Promise<SubAgentResult<TOutput>> {
     const startTime = Date.now();
     const ideType = this.routeTask(complexity);
     const agentId = `${ideType}-${++this.agentCounter}-${Date.now().toString(36).slice(-4)}`;
+    
+    // Emit routing decision
+    if (this.onRoutingDecision && taskId) {
+      this.onRoutingDecision({
+        taskId,
+        complexity,
+        routedTo: ideType,
+        reason: `Complexity: ${complexity.level} → ${ideType}`
+      });
+    }
     
     // For now, simulate sub-agent execution
     // In production, this would use sessions_spawn

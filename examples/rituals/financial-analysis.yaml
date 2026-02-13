@@ -1,0 +1,33 @@
+# Financial Analysis Ritual
+# Multi-agent durable execution for comprehensive stock analysis
+
+goal: Analyze NVDA stock with comprehensive research and valuation
+
+tasks:
+  - type: market-research
+    description: Research NVDA current market position, recent news, and analyst sentiment
+    complexity: moderate
+    
+  - type: financial-data
+    description: Retrieve NVDA financial statements, revenue, margins, and key metrics
+    complexity: simple
+    
+  - type: peer-analysis
+    description: Compare NVDA to AMD, INTC, and QCOM on key financial metrics
+    complexity: moderate
+    dependsOn: [financial-data]
+    
+  - type: valuation-model
+    description: Build DCF and comparable valuation models
+    complexity: complex
+    dependsOn: [financial-data, peer-analysis]
+    
+  - type: risk-assessment
+    description: Identify key risks, competitive threats, and market headwinds
+    complexity: moderate
+    dependsOn: [market-research]
+    
+  - type: final-report
+    description: Synthesize all analysis into comprehensive investment research report
+    complexity: complex
+    dependsOn: [valuation-model, risk-assessment, peer-analysis]

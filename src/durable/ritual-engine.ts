@@ -11,8 +11,10 @@ import {
   TaskComplexity, 
   SubAgentResult,
   StateMutation,
-  Checkpoint 
+  Checkpoint,
+  IDEType
 } from './types.js';
+import { MetricsCollector } from '../observability/collector.js';
 import * as path from 'path';
 import * as os from 'os';
 
@@ -78,6 +80,7 @@ export interface RitualOptions {
 export class RitualEngine {
   private pool: AgentPool;
   private checkpointManager: CheckpointManager;
+  private metricsCollector: MetricsCollector;
   private rituals: Map<string, Ritual> = new Map();
   private options: Required<RitualOptions>;
   
@@ -91,8 +94,21 @@ export class RitualEngine {
       onCheckpoint: options.onCheckpoint || (() => {})
     };
     
-    this.pool = new AgentPool();
+    this.pool = new AgentPool({
+      onRoutingDecision: (decision) => {
+        this.metricsCollector.recordRouting({
+          timestamp: Date.now(),
+          taskId: decision.taskId,
+          ritualId: '', // Would need to track this better
+          complexity: decision.complexity,
+          routedTo: decision.routedTo,
+          reason: decision.reason,
+          estimatedCost: this.calculateEstimatedCost(decision.routedTo, decision.complexity.estimatedTokens)
+        });
+      }
+    });
     this.checkpointManager = new CheckpointManager(this.options.checkpointDir);
+    this.metricsCollector = new MetricsCollector(path.join(os.homedir(), '.summon', 'metrics'));
   }
   
   // ========================================================================
@@ -116,8 +132,27 @@ export class RitualEngine {
     };
     
     if (plan) {
+      // First pass: create all tasks
       for (const taskPlan of plan.tasks) {
         ritual.tasks.push(this.createTask(taskPlan));
+      }
+      
+      // Second pass: map dependsOn from types to IDs
+      const typeToId = new Map<string, string>();
+      for (const task of ritual.tasks) {
+        typeToId.set(task.type, task.id);
+      }
+      
+      for (const task of ritual.tasks) {
+        if (task.dependsOn && task.dependsOn.length > 0) {
+          task.dependsOn = task.dependsOn.map(depType => {
+            const depId = typeToId.get(depType);
+            if (!depId) {
+              console.warn(`Warning: Dependency '${depType}' not found for task '${task.type}'`);
+            }
+            return depId || depType; // Fallback to original if not found
+          }).filter(Boolean) as string[];
+        }
       }
     }
     
@@ -132,7 +167,16 @@ export class RitualEngine {
     ritual.state = 'running';
     ritual.metadata.startedAt = Date.now();
     
-    await this.executeRitual(ritual);
+    // Start metrics tracking
+    this.metricsCollector.startRitual(ritual);
+    
+    try {
+      await this.executeRitual(ritual);
+      this.metricsCollector.completeRitual(ritualId, 'completed');
+    } catch (err) {
+      this.metricsCollector.completeRitual(ritualId, 'failed');
+      throw err;
+    }
   }
   
   async resumeRitual(ritualId: string): Promise<void> {
@@ -218,7 +262,7 @@ export class RitualEngine {
     };
     
     try {
-      const result = await this.pool.spawnSubAgent(microTask, task.complexity, ritual.id);
+      const result = await this.pool.spawnSubAgent(microTask, task.complexity, ritual.id, task.id);
       
       task.completedAt = Date.now();
       task.sessionId = result.sessionId;
@@ -235,9 +279,15 @@ export class RitualEngine {
         
         ritual.metadata.totalTokensUsed += result.metrics.tokensUsed;
         ritual.metadata.estimatedCost += this.calculateCost(result);
+        
+        // Record task metrics
+        this.metricsCollector.recordTaskComplete(task, result);
       } else {
         task.status = 'failed';
         task.error = result.error?.message || 'Unknown error';
+        
+        // Record failed task metrics too
+        this.metricsCollector.recordTaskComplete(task, result);
       }
       
       this.options.onTaskComplete(task, result);
@@ -326,6 +376,17 @@ export class RitualEngine {
     
     const rate = rates[result.agentType] || 0.005;
     return (result.metrics.tokensUsed / 1000) * rate;
+  }
+  
+  private calculateEstimatedCost(agentType: IDEType, estimatedTokens: number): number {
+    const rates: Record<string, number> = {
+      claude: 0.008,
+      codex: 0.003,
+      kimi: 0.005,
+      opencode: 0.001
+    };
+    const rate = rates[agentType] || 0.005;
+    return (estimatedTokens / 1000) * rate;
   }
   
   getRitualStats(ritualId: string): {
