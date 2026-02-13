@@ -242,6 +242,12 @@ export class AgentOrchestrator {
         if (event.type === 'tool_error') {
           emit({ type: 'agent_tool_error', agentId, tool: event.tool, error: event.error });
         }
+        if (event.type === 'guardrail_check') {
+          emit({ type: 'agent_guardrail_check', agentId, passed: event.passed, attemptCount: event.attemptCount, errors: event.errors });
+        }
+        if (event.type === 'guardrail_failed') {
+          emit({ type: 'agent_guardrail_failed', agentId, errors: event.errors });
+        }
       }
     } catch (error) {
       const rawMessage = error instanceof Error ? error.message : String(error);

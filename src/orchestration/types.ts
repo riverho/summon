@@ -83,6 +83,8 @@ export type OrchestrationEvent =
   | { type: 'agent_tool_call'; agentId: string; tool: string; args: unknown }
   | { type: 'agent_tool_end'; agentId: string; tool: string; durationMs: number }
   | { type: 'agent_tool_error'; agentId: string; tool: string; error: string }
+  | { type: 'agent_guardrail_check'; agentId: string; passed: boolean; attemptCount: number; errors: string[] }
+  | { type: 'agent_guardrail_failed'; agentId: string; errors: string[] }
   | { type: 'agent_done'; agentId: string; output: string }
   | { type: 'handoff'; from: string; to: string; data: unknown }
   | { type: 'orchestration_pause'; stage: 'coordinator' | 'handoff' | 'final'; message: string }

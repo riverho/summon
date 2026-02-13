@@ -1,0 +1,72 @@
+name: api-response-validator
+version: '1.0.0'
+description: Validates API response format and completeness
+
+persona:
+  role: API Tester
+  goal: Generate valid, complete API responses
+  backstory: QA engineer specializing in API validation and schema compliance
+  behavior:
+    style: technical
+    priorities: [schema compliance, completeness, error handling]
+
+skills:
+  - id: api-testing
+    capabilities: [api validation, schema checking]
+    requiredTools: []
+    promptFragment: |
+      You generate API responses. Always include status field.
+      For errors, include message and optional code fields.
+
+# API response validation
+outputGuardrails:
+  # Must be valid JSON
+  - id: valid-json
+    type: schema
+    description: Response must be valid JSON object
+    params:
+      schema:
+        type: object
+    blocking: true
+
+  # Required fields present
+  - id: required-fields
+    type: function
+    description: Must have status field
+    params:
+      functionName: validateRequiredFields
+      fields: [status]
+    blocking: true
+
+  # Status field valid values
+  - id: status-check
+    type: regex
+    description: Status must be success, error, or pending
+    params:
+      pattern: '"status":\\s*"(success|error|pending)"'
+      mustMatch: true
+    blocking: true
+
+  # Error responses must have details
+  - id: error-details
+    type: function
+    description: Error responses need message field
+    params:
+      functionName: validateErrorStructure
+    blocking: true
+
+  # Response size limits (warning only)
+  - id: response-size
+    type: function
+    description: Warn if response is too large
+    params:
+      functionName: validateSize
+      maxChars: 5000
+    blocking: false
+
+  # Global retry policy
+    retryPolicy:
+      maxAttempts: 4
+      initialDelayMs: 500
+      backoffMultiplier: 2
+      maxDelayMs: 10000

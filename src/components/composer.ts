@@ -6,6 +6,7 @@ import {
   ComponentRegistry,
   PersonaRef,
   SkillRef,
+  GuardrailConfig,
 } from './types.js';
 import { globalToolRegistry, RegisteredTool } from '../runtime/tools.js';
 import { createComponentRegistry } from './registry.js';
@@ -306,6 +307,7 @@ export interface ComposedAgentSpec {
       blockUnsubstantiatedClaims: 'warn' | 'strict' | 'off';
     };
   };
+  outputGuardrails?: GuardrailConfig[];
 }
 
 /**
@@ -382,6 +384,7 @@ export function composeAgent(composition: AgentComposition): ComposedAgentSpec {
         blockUnsubstantiatedClaims: guardrails.safety?.blockUnsubstantiatedClaims ?? 'warn',
       },
     } : undefined,
+    outputGuardrails: composition.outputGuardrails,
   };
 }
 

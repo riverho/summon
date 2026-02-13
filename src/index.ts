@@ -27,7 +27,49 @@ export {
   DoneEvent,
   ToolCallRecord,
   ComposedAgentConfig,
+  // Guardrail types (NEW)
+  GuardrailConfig,
+  GuardrailConfigSchema,
+  GuardrailCheckEvent,
+  GuardrailFailedEvent,
+  RetryPolicy,
+  RetryPolicySchema,
 } from './components/types.js';
+
+// Guardrails (NEW)
+export {
+  GuardrailValidator,
+  GuardrailValidationError,
+  createSchemaGuardrail,
+  createRegexGuardrail,
+  createFunctionGuardrail,
+  createLlmJudgeGuardrail,
+  validateWithSchema,
+} from './guardrails/validator.js';
+
+export {
+  jsonSchema,
+  noTodos,
+  properErrorHandling,
+  codeComplexity,
+  requiredFields,
+  nonEmptyFields,
+  arrayLength,
+  semanticJudge,
+  relevance,
+  toneCheck,
+  fileExists,
+  directoryStructure,
+  fileContent,
+  combineGuardrails,
+  anyOf,
+} from './guardrails/rules.js';
+
+export type {
+  GuardrailResult,
+  GuardrailError,
+  ValidationResult,
+} from './guardrails/types.js';
 
 // Component Registry
 export {
@@ -95,6 +137,14 @@ export {
   RegisteredTool,
   globalToolRegistry,
 } from './runtime/tools.js';
+
+// Tool Loader
+export {
+  loadExternalTools,
+  registerExternalTools,
+  listExternalToolFiles,
+  ExternalToolDefinition,
+} from './runtime/tool-loader.js';
 
 // Orchestration
 export {

@@ -4,6 +4,7 @@ import { callLlm, getFastModel } from '../runtime/llm.js';
 import { Session } from '../runtime/session.js';
 import { InMemoryChatHistory } from '../runtime/memory.js';
 import { ComposedAgentSpec } from './composer.js';
+import { GuardrailValidator } from '../guardrails/validator.js';
 import type {
   AgentEvent,
   ToolStartEvent,
@@ -11,6 +12,14 @@ import type {
   ToolErrorEvent,
   ComposedAgentConfig,
 } from './types.js';
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // ============================================================================
 // Helper Functions
@@ -242,9 +251,76 @@ export class ComposedAgent {
         yield answerStartEvent;
 
         const finalResponse = await this.callModel(finalPrompt, false);
-        const answer = typeof finalResponse === 'string'
+        let answer = typeof finalResponse === 'string'
           ? finalResponse
           : extractTextContent(finalResponse);
+
+        // Run guardrails validation if configured
+        if (this.spec.outputGuardrails && this.spec.outputGuardrails.length > 0) {
+          const validator = new GuardrailValidator();
+          validator.addGuardrails(this.spec.outputGuardrails);
+
+          let result = await validator.validate(answer);
+          let attempts = 1;
+
+          // Retry loop for guardrail failures
+          while (!result.success && attempts < 3) {
+            // Emit check event for monitoring
+            yield {
+              type: 'guardrail_check',
+              passed: false,
+              attemptCount: attempts,
+              errors: result.errors.map(e => `[${e.guardrailId}] ${e.message}`),
+            };
+
+            // Wait before retry
+            const backoffDelay = 1000 * Math.pow(2, attempts - 1);
+            await sleep(backoffDelay);
+
+            // Build retry prompt with error context
+            const errorContext = result.errors.map(e => `[${e.guardrailId}] ${e.message}`).join('\n');
+            const retryPrompt = `${finalPrompt}\n\n=== VALIDATION ERRORS ===\nThe previous response failed validation:\n${errorContext}\n\nPlease fix these issues and provide a corrected response.`;
+
+            const retryResponse = await this.callModel(retryPrompt, false);
+            answer = typeof retryResponse === 'string'
+              ? retryResponse
+              : extractTextContent(retryResponse);
+
+            attempts++;
+            result = await validator.validate(answer);
+          }
+
+          // Emit final check result
+          yield {
+            type: 'guardrail_check',
+            passed: result.success,
+            attemptCount: attempts,
+            errors: result.errors.map(e => `[${e.guardrailId}] ${e.message}`),
+          };
+
+          // Handle persistent failures
+          if (!result.success) {
+            const blockingErrors = result.errors.filter(e => e.blocking);
+            if (blockingErrors.length > 0) {
+              yield {
+                type: 'guardrail_failed',
+                answer,
+                errors: blockingErrors.map(e => `[${e.guardrailId}] ${e.message}`),
+              };
+
+              const doneEvent = {
+                type: 'done' as const,
+                answer: `[${this.spec.name}] [GUARDRAIL FAILED] ${blockingErrors.map(e => e.message).join('; ')}`,
+                toolCalls: session.getToolCallRecords(),
+                iterations: iteration,
+                guardrailFailed: true,
+              };
+              this.lastEvent = doneEvent;
+              yield doneEvent;
+              return;
+            }
+          }
+        }
 
         const prefixedAnswer = `[${this.spec.name}] ${answer}`;
         const doneEvent = {

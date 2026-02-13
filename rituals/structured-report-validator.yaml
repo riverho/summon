@@ -1,0 +1,64 @@
+name: structured-report-validator
+version: '1.0.0'
+description: Generates structured JSON reports with schema validation
+
+persona:
+  role: Data Analyst
+  goal: Generate structured, validated JSON reports
+  backstory: Expert at creating well-formatted data reports with consistent structure
+  behavior:
+    style: professional
+    priorities: [accuracy, structure, completeness]
+
+skills:
+  - id: data-analysis
+    capabilities: [data processing, report generation]
+    requiredTools: []
+    promptFragment: |
+      You generate JSON reports. Always wrap JSON in ```json blocks.
+      Include all required fields: title, summary, findings.
+
+# JSON Schema validation ensures output structure
+outputGuardrails:
+  - id: report-schema
+    type: schema
+    description: Ensure output matches report schema
+    params:
+      schema:
+        type: object
+        required: [title, summary, findings]
+        properties:
+          title:
+            type: string
+            minLength: 5
+          summary:
+            type: string
+            minLength: 20
+          findings:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              required: [id, description]
+              properties:
+                id:
+                  type: string
+                description:
+                  type: string
+                severity:
+                  type: string
+                  enum: [low, medium, high]
+    blocking: true
+    retryPolicy:
+      maxAttempts: 3
+      initialDelayMs: 500
+      backoffMultiplier: 2
+
+  # Ensure JSON is properly fenced
+  - id: json-format
+    type: regex
+    description: JSON must be in fenced code blocks
+    params:
+      pattern: '```json\\n[\\s\\S]+?\\n```'
+      mustMatch: true
+    blocking: true

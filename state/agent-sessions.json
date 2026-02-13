@@ -1,8 +1,9 @@
 {
   "version": "2.0.0",
   "schema": {
-    "lastUpdated": "2026-02-07T03:17:00Z",
+    "lastUpdated": "2026-02-10T13:25:00Z",
     "changelog": [
+      "v2.0.1: Archived orphaned sessions (builder_ABC2, sa_graduation_builder, sa_reviewer)",
       "v2.0.0: Added dependency DAG, retry logic, capability registry, structured output",
       "v1.0.0: Basic session tracking"
     ]
@@ -114,11 +115,11 @@
     "m1_builder": {
       "id": "vivid-kelp",
       "agent": "codex",
-      "status": "failed",
+      "status": "archived",
       "startedAt": 0,
       "turns": 1,
-      "lastUpdate": "failed (codex exec usage error)",
-      "nextMilestone": "(done by Brad)",
+      "lastUpdate": "archived: failed session cleaned up (codex exec usage error)",
+      "nextMilestone": "(archived)",
       "retries": 1,
       "dependsOn": [],
       "outputs": {},
@@ -191,11 +192,11 @@
     "builder_ABC2": {
       "id": "crisp-sage",
       "agent": "codex",
-      "status": "completed",
+      "status": "archived",
       "startedAt": 1770347860625,
       "turns": 1,
-      "lastUpdate": "completed: hierarchical strict JSON plan + persistence/quiet + tests pass",
-      "nextMilestone": "review diff + commit",
+      "lastUpdate": "archived: orphaned session, artifacts preserved in state history",
+      "nextMilestone": "(archived)",
       "retries": 0,
       "dependsOn": [],
       "outputs": {
@@ -205,11 +206,11 @@
     "aa_crawler": {
       "id": "mellow-bloom",
       "agent": "codex",
-      "status": "completed",
+      "status": "merged",
       "startedAt": 1738898500000,
       "turns": 1,
-      "lastUpdate": "completed: Firecrawl crawler with models, extractor, client (artifacts exist)",
-      "nextMilestone": "ready for review",
+      "lastUpdate": "merged to main: crawler module consolidated (0ba1e5c)",
+      "nextMilestone": "(done)",
       "retries": 0,
       "dependsOn": [],
       "outputs": {
@@ -221,11 +222,11 @@
     "aa_refiner": {
       "id": "oceanic-mist",
       "agent": "kimi",
-      "status": "completed",
+      "status": "merged",
       "startedAt": 1738898500000,
       "turns": 1,
-      "lastUpdate": "completed: models.py + metrics.py + IMPLEMENTATION_PLAN.md (timeout, substantial progress)",
-      "nextMilestone": "ready for review",
+      "lastUpdate": "merged to main: refiner models/metrics consolidated (0ba1e5c)",
+      "nextMilestone": "(done)",
       "retries": 2,
       "dependsOn": [],
       "outputs": {
@@ -250,10 +251,10 @@
     "sa_refiner_builder": {
       "id": "quiet-river",
       "agent": "codex",
-      "status": "completed",
+      "status": "merged",
       "startedAt": 1739106400000,
       "turns": 1,
-      "lastUpdate": "completed: yaml_refiner.py + STATUS.md + IMPLEMENTATION_PLAN.md",
+      "lastUpdate": "merged to main: yaml_refiner.py committed (d5fc06d)",
       "nextMilestone": "(done)",
       "retries": 0,
       "dependsOn": [],
@@ -266,11 +267,11 @@
     "sa_graduation_builder": {
       "id": "swift-trail",
       "agent": "kimi",
-      "status": "completed",
+      "status": "archived",
       "startedAt": 1739106405000,
       "turns": 1,
-      "lastUpdate": "completed: graduation.py + GraduationChecker + STATUS.md",
-      "nextMilestone": "(done)",
+      "lastUpdate": "archived: worktree at /tmp/sa-graduation-kimi, project inactive",
+      "nextMilestone": "(archived)",
       "retries": 0,
       "dependsOn": [],
       "outputs": {
@@ -282,11 +283,11 @@
     "sa_reviewer": {
       "id": "gentle-meadow",
       "agent": "claude",
-      "status": "completed",
+      "status": "archived",
       "startedAt": 1739107840000,
       "turns": 1,
-      "lastUpdate": "completed: REVIEW.md delivered (16KB)",
-      "nextMilestone": "(done)",
+      "lastUpdate": "archived: worktree at /tmp/sa-review-claude-v3, project inactive",
+      "nextMilestone": "(archived)",
       "retries": 3,
       "dependsOn": ["sa_refiner_builder", "sa_graduation_builder"],
       "outputs": {
@@ -326,11 +327,11 @@
     "sa_phase3_reviewer": {
       "id": null,
       "agent": "claude",
-      "status": "waiting",
+      "status": "archived",
       "startedAt": 0,
       "turns": 0,
-      "lastUpdate": "waiting for static simulation first",
-      "nextMilestone": "review existing code + run static test",
+      "lastUpdate": "archived: stale waiting session (idle since Jan 9, no activity)",
+      "nextMilestone": "(archived)",
       "retries": 0,
       "dependsOn": [],
       "outputs": {},
@@ -340,10 +341,10 @@
     "multiagent_builder": {
       "id": "tender-claw",
       "agent": "codex",
-      "status": "completed",
+      "status": "merged",
       "startedAt": 1739147760000,
       "turns": 1,
-      "lastUpdate": "completed: all milestones done, typecheck passed",
+      "lastUpdate": "merged to main: all changes committed (6e868ee)",
       "nextMilestone": "(done)",
       "retries": 0,
       "dependsOn": [],

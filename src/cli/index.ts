@@ -12,6 +12,7 @@ import {
 import { composeAgent, quickCompose, type ComposedAgentSpec } from '../components/composer.js';
 import { ComposedAgent } from '../components/composed-agent.js';
 import { globalToolRegistry } from '../runtime/tools.js';
+import { registerExternalTools, listExternalToolFiles } from '../runtime/tool-loader.js';
 import { ChatHistoryManager, generateSessionId } from '../runtime/chat-history.js';
 import { AgentOrchestrator } from '../orchestration/orchestrator.js';
 import { createStorageAdapter } from '../storage/index.js';
@@ -667,6 +668,31 @@ program
     }
   });
 
+program
+  .command('tools')
+  .description('List registered tools and external tool files')
+  .option('-e, --external', 'Show external tool file paths')
+  .action((options: { external?: boolean }) => {
+    console.log('Registered Tools:');
+    for (const name of globalToolRegistry.getNames()) {
+      console.log(`  - ${name}`);
+    }
+
+    if (options.external) {
+      console.log('\nExternal Tool Files:');
+      const externalFiles = listExternalToolFiles();
+      if (externalFiles.length === 0) {
+        console.log('  (none found)');
+        console.log('\nExternal tools directory:');
+        console.log('  ~/.summon_mem/components/tools/');
+      } else {
+        for (const file of externalFiles) {
+          console.log(`  - ${file}`);
+        }
+      }
+    }
+  });
+
 // ============================================================================
 // Sessions Commands
 // ============================================================================
@@ -757,14 +783,18 @@ sessionsCmd
 // ============================================================================
 // Tools Registration (auto-load skills)
 // ============================================================================
-
-import '../builtin/skills/finance/index.js';
+// NOTE: Finance skill is now external (~/.summon_mem/components/skills/finance.yaml)
+// It uses the stub financial_search tool from runtime/tools.ts
+// import '../builtin/skills/finance/index.js';
 import '../builtin/skills/web-search/index.js';
 import '../builtin/skills/git/index.js';
 import '../builtin/skills/file/index.js';
 import { createMCPCommands } from './mcp-commands.js';
 
-function registerAvailableTools(): void {
+async function registerAvailableTools(): Promise<void> {
+  // Load external tools first with override (so they replace stubs)
+  await registerExternalTools({ override: true });
+
   const args = new Set(process.argv);
   const shouldLog = (args.has('--verbose') || args.has('-v')) && !args.has('--json') && !args.has('--quiet') && !args.has('-q');
   if (!shouldLog) return;
@@ -773,7 +803,7 @@ function registerAvailableTools(): void {
     console.log(`  ✓ ${name}`);
   }
 }
-registerAvailableTools();
+await registerAvailableTools();
 
 // ============================================================================
 // MCP Commands

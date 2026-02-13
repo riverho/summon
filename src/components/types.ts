@@ -144,6 +144,30 @@ export const GuardrailsConfigSchema = z.object({
 export type GuardrailsConfig = z.infer<typeof GuardrailsConfigSchema>;
 
 // ============================================================================
+// Output Guardrails Configuration (New)
+// ============================================================================
+
+export const RetryPolicySchema = z.object({
+  maxAttempts: z.number().default(3),
+  initialDelayMs: z.number().default(1000),
+  backoffMultiplier: z.number().default(2),
+  maxDelayMs: z.number().default(30000),
+});
+
+export type RetryPolicy = z.infer<typeof RetryPolicySchema>;
+
+export const GuardrailConfigSchema = z.object({
+  id: z.string(),
+  type: z.enum(['schema', 'regex', 'function', 'llm-judge']),
+  description: z.string().optional(),
+  params: z.record(z.string(), z.unknown()),
+  blocking: z.boolean().default(true),
+  retryPolicy: RetryPolicySchema.optional(),
+});
+
+export type GuardrailConfig = z.infer<typeof GuardrailConfigSchema>;
+
+// ============================================================================
 // Agent Composition (Portable YAML Format)
 // ============================================================================
 
@@ -167,8 +191,11 @@ export const AgentCompositionSchema = z.object({
   // Workflow configuration
   workflow: WorkflowConfigSchema.optional(),
 
-  // Guardrails configuration
+  // Guardrails configuration (legacy - consider migrating to outputGuardrails)
   guardrails: GuardrailsConfigSchema.optional(),
+
+  // Output guardrails (NEW) - validate agent outputs before state mutation
+  outputGuardrails: z.array(GuardrailConfigSchema).optional(),
 });
 
 export type AgentComposition = z.infer<typeof AgentCompositionSchema>;
@@ -240,6 +267,7 @@ export interface DoneEvent {
   answer: string;
   toolCalls: ToolCallRecord[];
   iterations: number;
+  guardrailFailed?: boolean;
 }
 
 export interface ToolCallRecord {
@@ -248,13 +276,32 @@ export interface ToolCallRecord {
   result: string;
 }
 
+// ============================================================================
+// Guardrail Event Types
+// ============================================================================
+
+export interface GuardrailCheckEvent {
+  type: 'guardrail_check';
+  passed: boolean;
+  attemptCount: number;
+  errors: string[];
+}
+
+export interface GuardrailFailedEvent {
+  type: 'guardrail_failed';
+  answer: string;
+  errors: string[];
+}
+
 export type AgentEvent =
   | ToolStartEvent
   | ToolEndEvent
   | ToolErrorEvent
   | ThinkingEvent
   | AnswerStartEvent
-  | DoneEvent;
+  | DoneEvent
+  | GuardrailCheckEvent
+  | GuardrailFailedEvent;
 
 // ============================================================================
 // Composed Agent Configuration

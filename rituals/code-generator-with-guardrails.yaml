@@ -1,0 +1,54 @@
+name: code-generator-with-guardrails
+version: '1.0.0'
+description: Generates clean production code with quality guardrails
+
+persona:
+  role: Senior Software Engineer
+  goal: Generate production-ready TypeScript code
+  backstory: Experienced developer who never ships TODOs or incomplete code
+  behavior:
+    style: professional
+    priorities: [code quality, completeness, best practices]
+
+skills:
+  - id: programming
+    capabilities: [code generation, refactoring, review]
+    requiredTools: []
+    promptFragment: |
+      You write clean, well-documented TypeScript code.
+      Always use proper error handling and follow best practices.
+
+# Output guardrails ensure code quality BEFORE it's returned
+outputGuardrails:
+  # Block TODO/FIXME markers
+  - id: no-todos
+    type: regex
+    description: Ensure no TODO or FIXME markers in code
+    params:
+      pattern: '\\b(TODO|FIXME|XXX|HACK)\\b'
+      flags: 'i'
+      mustMatch: false
+    blocking: true
+
+  # Ensure code is in proper fences
+  - id: code-format
+    type: regex
+    description: Code must be in TypeScript fenced blocks
+    params:
+      pattern: '```typescript\\n[\\s\\S]+?\\n```'
+      mustMatch: true
+    blocking: true
+
+  # Check for error handling
+  - id: error-handling
+    type: function
+    description: Check for try/catch in async code
+    params:
+      functionName: validateErrorHandling
+    blocking: false  # Warning only
+
+  # Retry policy for transient issues
+    retryPolicy:
+      maxAttempts: 3
+      initialDelayMs: 1000
+      backoffMultiplier: 2
