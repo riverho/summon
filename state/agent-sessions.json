@@ -61,6 +61,18 @@
       "staleThresholdMinutes": 5,
       "autoCleanup": true,
       "cleanupAction": "mark-stale"
+    },
+    "worktreePolicy": {
+      "baseDir": "~/.openclaw/ao-sessions",
+      "activeDir": "active",
+      "archiveDir": "archived",
+      "sharedDir": "shared",
+      "templatesDir": "templates",
+      "namingConvention": "{project}-{task}-{agent}-{timestamp}",
+      "retentionDays": 30,
+      "autoArchive": true,
+      "autoCleanupArchived": true,
+      "indexFile": "index.jsonl"
     }
   },
   "sessions": {
@@ -209,7 +221,7 @@
       "status": "merged",
       "startedAt": 1738898500000,
       "turns": 1,
-      "lastUpdate": "merged to main: crawler module consolidated (0ba1e5c)",
+      "lastUpdate": "merged to main: crawler module consolidated (0ba1e5c) - moved to ao-sessions",
       "nextMilestone": "(done)",
       "retries": 0,
       "dependsOn": [],
@@ -217,7 +229,7 @@
         "artifacts": ["STATUS.md", "IMPLEMENTATION_PLAN.md", "crawler/"]
       },
       "project": "summon-academy",
-      "worktree": "/tmp/summon-academy-crawler"
+      "worktree": "~/.openclaw/ao-sessions/archived/summon-academy-crawler"
     },
     "aa_refiner": {
       "id": "oceanic-mist",
@@ -225,7 +237,7 @@
       "status": "merged",
       "startedAt": 1738898500000,
       "turns": 1,
-      "lastUpdate": "merged to main: refiner models/metrics consolidated (0ba1e5c)",
+      "lastUpdate": "merged to main: refiner models/metrics consolidated (0ba1e5c) - moved to ao-sessions",
       "nextMilestone": "(done)",
       "retries": 2,
       "dependsOn": [],
@@ -233,7 +245,7 @@
         "artifacts": ["IMPLEMENTATION_PLAN.md", "refiner/models.py", "refiner/metrics.py"]
       },
       "project": "summon-academy",
-      "worktree": "/tmp/summon-academy-refiner"
+      "worktree": "~/.openclaw/ao-sessions/archived/summon-academy-refiner"
     },
     "aa_reviewer": {
       "id": "amber-rook",
@@ -254,7 +266,7 @@
       "status": "merged",
       "startedAt": 1739106400000,
       "turns": 1,
-      "lastUpdate": "merged to main: yaml_refiner.py committed (d5fc06d)",
+      "lastUpdate": "merged to main: yaml_refiner.py committed (d5fc06d) - moved to ao-sessions",
       "nextMilestone": "(done)",
       "retries": 0,
       "dependsOn": [],
@@ -262,7 +274,7 @@
         "artifacts": ["refiner/yaml_refiner.py", "refiner/__init__.py", "STATUS.md", "IMPLEMENTATION_PLAN.md"]
       },
       "project": "summon-academy",
-      "worktree": "/tmp/sa-refiner-codex"
+      "worktree": "~/.openclaw/ao-sessions/archived/sa-refiner-codex"
     },
     "sa_graduation_builder": {
       "id": "swift-trail",
@@ -270,7 +282,7 @@
       "status": "archived",
       "startedAt": 1739106405000,
       "turns": 1,
-      "lastUpdate": "archived: worktree at /tmp/sa-graduation-kimi, project inactive",
+      "lastUpdate": "archived: moved to ao-sessions/archived/",
       "nextMilestone": "(archived)",
       "retries": 0,
       "dependsOn": [],
@@ -278,7 +290,7 @@
         "artifacts": ["refiner/graduation.py", "refiner/__init__.py", "STATUS.md"]
       },
       "project": "summon-academy",
-      "worktree": "/tmp/sa-graduation-kimi"
+      "worktree": "~/.openclaw/ao-sessions/archived/sa-graduation-kimi"
     },
     "sa_reviewer": {
       "id": "gentle-meadow",
@@ -286,7 +298,7 @@
       "status": "archived",
       "startedAt": 1739107840000,
       "turns": 1,
-      "lastUpdate": "archived: worktree at /tmp/sa-review-claude-v3, project inactive",
+      "lastUpdate": "archived: moved to ao-sessions/archived/",
       "nextMilestone": "(archived)",
       "retries": 3,
       "dependsOn": ["sa_refiner_builder", "sa_graduation_builder"],
@@ -294,7 +306,7 @@
         "artifacts": ["/tmp/sa-review-claude-v2/REVIEW.md"]
       },
       "project": "summon-academy",
-      "worktree": "/tmp/sa-review-claude-v3"
+      "worktree": "~/.openclaw/ao-sessions/archived/sa-review-claude-v3"
     },
     "sa_langsmith_builder": {
       "id": "clear-valley",
@@ -302,13 +314,13 @@
       "status": "cancelled",
       "startedAt": 1739112200000,
       "turns": 0,
-      "lastUpdate": "cancelled by user - pivot to static first",
+      "lastUpdate": "cancelled by user - moved to ao-sessions/archived/",
       "nextMilestone": "(cancelled)",
       "retries": 0,
       "dependsOn": [],
       "outputs": {},
       "project": "summon-academy",
-      "worktree": "/tmp/sa-langsmith-kimi"
+      "worktree": "~/.openclaw/ao-sessions/archived/sa-langsmith-kimi"
     },
     "sa_pipeline_builder": {
       "id": "tide-breeze",
@@ -316,13 +328,13 @@
       "status": "cancelled",
       "startedAt": 1739112200000,
       "turns": 0,
-      "lastUpdate": "cancelled by user - pivot to static first",
+      "lastUpdate": "cancelled by user - moved to ao-sessions/archived/",
       "nextMilestone": "(cancelled)",
       "retries": 0,
       "dependsOn": [],
       "outputs": {},
       "project": "summon-academy",
-      "worktree": "/tmp/sa-pipeline-codex"
+      "worktree": "~/.openclaw/ao-sessions/archived/sa-pipeline-codex"
     },
     "sa_phase3_reviewer": {
       "id": null,
@@ -330,13 +342,13 @@
       "status": "archived",
       "startedAt": 0,
       "turns": 0,
-      "lastUpdate": "archived: stale waiting session (idle since Jan 9, no activity)",
+      "lastUpdate": "archived: moved to ao-sessions/archived/",
       "nextMilestone": "(archived)",
       "retries": 0,
       "dependsOn": [],
       "outputs": {},
       "project": "summon-academy",
-      "worktree": "/tmp/sa-review-phase3"
+      "worktree": "~/.openclaw/ao-sessions/archived/sa-review-phase3"
     },
     "multiagent_builder": {
       "id": "tender-claw",
