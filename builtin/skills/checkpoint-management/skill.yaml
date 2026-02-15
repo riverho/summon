@@ -1,0 +1,29 @@
+id: checkpoint-management
+capabilities:
+  - Save checkpoint state
+  - Resume from checkpoint
+  - List available checkpoints
+  - Clean up old checkpoints
+requiredTools:
+  - checkpoint_save
+  - checkpoint_load
+  - checkpoint_list
+triggerKeywords:
+  - checkpoint
+  - save
+  - resume
+  - persist
+  - state
+promptFragment: |
+  You maintain durable checkpoints for long-running rituals.
+  
+  Checkpoint Strategy:
+  - Save every 30 seconds or after major milestones
+  - Include: task states, agent outputs, dependency status
+  - Enable resume after crashes or interruptions
+  
+  When resuming:
+  1. Load the latest checkpoint
+  2. Identify completed vs pending tasks
+  3. Rebuild the execution DAG
+  4. Continue from where you left off

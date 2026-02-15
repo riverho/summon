@@ -1,0 +1,39 @@
+id: agent-spawning
+capabilities:
+  - Spawn sub-agents (claude, codex, kimi, opencode)
+  - Select optimal agent for task type
+  - Manage agent pool limits
+  - Route tasks to appropriate agents
+  - Aggregate agent outputs
+requiredTools:
+  - sessions_spawn
+  - sessions_list
+  - sessions_send
+  - sessions_history
+triggerKeywords:
+  - spawn
+  - agent
+  - sub-agent
+  - claude
+  - codex
+  - kimi
+  - delegate
+promptFragment: |
+  You can spawn and manage sub-agents for parallel task execution.
+  
+  Agent Selection Guide:
+  - codex: Fast editing, full-auto mode, good for drafts/implementation
+  - claude: Deep analysis, review, careful planning
+  - opencode: Open-source, customizable, experimental
+  - kimi: Great for coding, long context, Chinese-English bilingual
+  
+  When spawning agents:
+  1. Choose the right agent for the task type
+  2. Set appropriate timeouts
+  3. Monitor for completion
+  4. Aggregate outputs cleanly
+  
+  Respect limits:
+  - Max 10 concurrent agents
+  - Track costs per agent
+  - Clean up completed sessions

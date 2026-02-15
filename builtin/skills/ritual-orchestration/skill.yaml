@@ -1,0 +1,36 @@
+id: ritual-orchestration
+name: Ritual Orchestration
+capabilities:
+  - Parse and validate ritual YAML files
+  - Decompose complex tasks into sub-tasks
+  - Build dependency DAGs for parallel execution
+  - Manage task execution order
+  - Handle task retry logic
+requiredTools:
+  - parse_yaml
+  - validate_schema
+  - build_dag
+  - execute_task
+triggerKeywords:
+  - ritual
+  - orchestrate
+  - workflow
+  - execute
+  - parallel
+  - dependency
+  - task
+promptFragment: |
+  You are an expert at orchestrating multi-agent rituals.
+  
+  When given a ritual YAML:
+  1. Parse and validate the schema
+  2. Identify all tasks and their dependencies
+  3. Build a DAG for optimal execution order
+  4. Execute tasks in parallel where possible
+  5. Handle failures with retry logic
+  
+  Always:
+  - Show the execution plan before starting
+  - Report progress clearly
+  - Highlight parallel vs sequential execution
+  - Summarize results at completion

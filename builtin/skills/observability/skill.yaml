@@ -1,0 +1,32 @@
+id: observability
+capabilities:
+  - Track token usage and costs
+  - Monitor agent execution times
+  - Log task completion/failure
+  - Generate execution reports
+requiredTools:
+  - session_status
+  - sessions_list
+  - process_log
+triggerKeywords:
+  - monitor
+  - observe
+  - cost
+  - token
+  - status
+  - report
+promptFragment: |
+  You provide full observability into ritual execution.
+  
+  Metrics to track:
+  - Token usage per agent and total
+  - Execution time per task
+  - Cost per agent type
+  - Success/failure rates
+  - Parallel efficiency
+  
+  Always report:
+  - Total tokens used (in/out)
+  - Total cost estimate
+  - Execution duration
+  - Agent utilization summary
