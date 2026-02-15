@@ -160,9 +160,8 @@ export * from './storage/index.js';
 export {
   RitualEngine,
   createRitualEngine,
-} from './durable/ritual-engine.js';
-
-export {
+  RitualEngineV2,
+  createRitualEngineV2,
   AgentPool,
   ContextManager,
   CheckpointManager,
@@ -173,6 +172,10 @@ export type {
   RitualTask,
   RitualPlan,
   RitualOptions,
+  RitualV2,
+  RitualTaskV2,
+  RitualPlanV2,
+  RitualOptionsV2,
   MicroTask,
   TaskComplexity,
   SubAgentResult,
@@ -200,3 +203,59 @@ export type {
 } from './observability/index.js';
 
 export type { WeeklyReport } from './observability/dashboard.js';
+
+// Agent Factory (Real OpenClaw Integration)
+export {
+  AgentFactory,
+  createAgentFactory,
+  TIER_CONFIGS,
+  AGENT_COSTS,
+} from './factory/index.js';
+
+export type {
+  UserTier,
+  TierConfig,
+  CostRates,
+  FactoryOptions,
+  ProvisionDecision,
+  SpawnEvent,
+  CompleteEvent,
+  ActiveSession,
+} from './factory/index.js';
+
+// OpenClaw Client
+export {
+  sessions_spawn,
+  sessions_list,
+  sessions_history,
+  sessions_send,
+  setMockMode,
+  isMockMode,
+  OpenClawError,
+  handleOpenClawError,
+} from './runtime/openclaw-client.js';
+
+export type {
+  SessionInfo,
+  SessionHistory,
+  SessionMessage,
+  ToolCall,
+  SpawnOptions,
+  SpawnResult,
+  ListOptions,
+  HistoryOptions,
+} from './runtime/openclaw-client.js';
+
+// Billing System
+export {
+  CreditSystem,
+  getCreditSystem,
+  setCreditSystem,
+} from './billing/index.js';
+
+export type {
+  CreditAccount,
+  CreditTransaction,
+  UsageReport,
+  BillingConfig,
+} from './billing/index.js';
