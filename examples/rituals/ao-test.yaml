@@ -1,0 +1,38 @@
+# Test Ritual for AO Agent
+# Usage: summon run ao --ritual ./test-ritual.yaml
+
+goal: Analyze a codebase and generate a report
+
+tasks:
+  - id: discover
+    type: discover
+    description: Find all source files in src/ directory
+    complexity: simple
+    
+  - id: analyze-structure
+    type: analyze
+    description: Analyze module structure and dependencies
+    complexity: moderate
+    dependsOn: [discover]
+    agent: claude
+    
+  - id: count-lines
+    type: analyze
+    description: Count lines of code per module
+    complexity: trivial
+    dependsOn: [discover]
+    agent: codex
+    
+  - id: find-todos
+    type: search
+    description: Find all TODO/FIXME comments
+    complexity: simple
+    dependsOn: [discover]
+    agent: kimi
+    
+  - id: generate-report
+    type: synthesize
+    description: Generate final markdown report
+    complexity: moderate
+    dependsOn: [analyze-structure, count-lines, find-todos]
+    agent: claude

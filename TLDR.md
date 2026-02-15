@@ -127,6 +127,7 @@ Port AO patterns to Summon when users need:
 - **Full analysis:** `notes/AO_INTEGRATION.md`
 - **AO location:** `~/.openclaw/workspace/skills/agent-orchestrator/`
 - **CF Worker:** `https://ao-cf1.shape02174.workers.dev`
+- **Phase 1 AO Package:** `examples/agents/ao-agent.yaml` — run with `summon run ao --ritual summon://examples/agents/ao-agent.yaml`
 
 ---
 
