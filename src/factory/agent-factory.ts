@@ -322,7 +322,7 @@ export class AgentFactory {
 
       const batchPromises = batch.map(input => {
         const task = { ...taskTemplate, input };
-        return this.spawnSubAgent(task, complexity, ritualId);
+        return this.spawnSubAgent(ritualId, task, complexity);
       });
 
       const batchResults = await Promise.all(batchPromises);

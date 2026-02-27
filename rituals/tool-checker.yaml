@@ -10,4 +10,8 @@ persona:
 skills:
   - $ref: finance
 
+model:
+  primary: z-ai/glm-5
+  provider: openrouter
+
 outputGuardrails: []

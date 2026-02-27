@@ -273,7 +273,7 @@ export class ComposedAgent {
             }
           }
 
-          const prefixedAnswer = `[${this.spec.name}] ${finalAnswer}`;
+          const prefixedAnswer = `[Answer] ${finalAnswer}`;
           const doneEvent = { type: 'done' as const, answer: prefixedAnswer, toolCalls: [], iterations: iteration, guardrailFailed: finalAnswer.startsWith('[GUARDRAIL FAILED]') };
           this.lastEvent = doneEvent;
           yield doneEvent;
@@ -349,7 +349,7 @@ export class ComposedAgent {
 
               const doneEvent = {
                 type: 'done' as const,
-                answer: `[${this.spec.name}] [GUARDRAIL FAILED] ${blockingErrors.map(e => e.message).join('; ')}`,
+                answer: `[Answer] [GUARDRAIL FAILED] ${blockingErrors.map(e => e.message).join('; ')}`,
                 toolCalls: session.getToolCallRecords(),
                 iterations: iteration,
                 guardrailFailed: true,
@@ -361,7 +361,7 @@ export class ComposedAgent {
           }
         }
 
-        const prefixedAnswer = `[${this.spec.name}] ${answer}`;
+        const prefixedAnswer = `[Answer] ${answer}`;
         const doneEvent = {
           type: 'done' as const,
           answer: prefixedAnswer,
@@ -402,7 +402,7 @@ export class ComposedAgent {
       ? finalResponse
       : extractTextContent(finalResponse);
 
-    const prefixedAnswer = `[${this.spec.name}] ${answer || `Reached maximum iterations (${this.spec.maxIterations}).`}`;
+    const prefixedAnswer = `[Answer] ${answer || `Reached maximum iterations (${this.spec.maxIterations}).`}`;
     const doneEvent = {
       type: 'done' as const,
       answer: prefixedAnswer,

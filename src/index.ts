@@ -71,6 +71,89 @@ export type {
   ValidationResult,
 } from './guardrails/types.js';
 
+// Advanced Guardrails (v2)
+export {
+  GuardrailEngine,
+  createGuardrailsFromPreferences,
+  loadGuardrails,
+  mergeGuardrails,
+  DEFAULT_ADVANCED_GUARDRAILS,
+} from './guardrails/advanced.js';
+
+export type {
+  AdvancedGuardrails,
+  ContentPolicy,
+  ToolPolicy,
+  CostPolicy,
+  QualityPolicy,
+  TimePolicy,
+  GuardrailCheck,
+  GuardrailCheckResult,
+  GuardrailContext,
+} from './guardrails/advanced.js';
+
+// User Preferences
+export {
+  loadPreferences,
+  savePreferences,
+  mergePreferences,
+  updatePreference,
+  setStylePreference,
+  setFormatPreference,
+  setSafetyPreference,
+  getRitualOverrides,
+  setRitualOverrides,
+  preferencesToSystemPrompt,
+  getPreferencesContext,
+  validatePreferences,
+  DEFAULT_PREFERENCES,
+  getPreferencesPath,
+} from './preferences/index.js';
+
+export type {
+  UserPreferences,
+  UserIdentity,
+  StylePreferences,
+  FormatPreferences,
+  SafetyPreferences,
+  LearningPreferences,
+} from './preferences/index.js';
+
+// User Memory (Long-term)
+export {
+  UserMemoryManager,
+  getUserMemoryManager,
+  setUserMemoryManager,
+  createDefaultMemory,
+} from './memory/index.js';
+
+export type {
+  UserMemory,
+  SummarizedInteraction,
+  RitualModification,
+  TrainingPattern,
+  LearnedPreferences,
+  RitualPreferenceOverride,
+} from './memory/index.js';
+
+// A/B Testing
+export {
+  ABTestManager,
+  getABTestManager,
+  setABTestManager,
+  createStandardTest,
+  DEFAULT_METRICS,
+} from './ab-testing/index.js';
+
+export type {
+  ABTest,
+  VariantConfig,
+  TestMetric,
+  VariantResult,
+  UserAssignment,
+  TestReport,
+} from './ab-testing/index.js';
+
 // Component Registry
 export {
   createComponentRegistry,
@@ -176,6 +259,7 @@ export type {
   RitualTaskV2,
   RitualPlanV2,
   RitualOptionsV2,
+  RitualExecutionResult,
   MicroTask,
   TaskComplexity,
   SubAgentResult,
@@ -183,6 +267,24 @@ export type {
   Checkpoint,
   IDEType,
 } from './durable/index.js';
+
+// Conditional Edges Engine
+export {
+  ConditionEngine,
+  createConditionEngine,
+  validateCondition,
+  validateConditions,
+} from './conditions/index.js';
+
+export type {
+  Condition,
+  ConditionContext,
+  ConditionEvaluationResult,
+  ConditionTrace,
+  EvaluationConfig,
+  StepResult,
+  EvaluationMethod,
+} from './conditions/index.js';
 
 // Observability (AO Stress Test #2)
 export {

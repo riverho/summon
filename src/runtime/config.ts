@@ -1,15 +1,14 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
-import { homedir } from 'os';
+import { SUMMON_HOME } from '../config/paths.js';
 
-const SUMMON_DIR = '.summon_mem';
 const SETTINGS_FILE = 'settings.json';
 
 /**
  * Get the summon config directory path
  */
 function getConfigDir(): string {
-  return join(homedir(), SUMMON_DIR);
+  return SUMMON_HOME;
 }
 
 /**

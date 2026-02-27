@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, appendFileSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
 import { createHash } from 'crypto';
 import { generateSessionId } from './chat-history.js';
+import { PATHS } from '../config/paths.js';
 
 /**
  * Record of a tool call for external consumers
@@ -45,7 +45,7 @@ export class Session {
   private readonly sessionId: string;
 
   constructor(query: string, options?: { sessionId?: string; baseDir?: string }) {
-    const baseDir = options?.baseDir || join(homedir(), '.summon_mem', 'sessions', 'runs');
+    const baseDir = options?.baseDir || PATHS.runs;
     this.sessionDir = baseDir;
     if (!existsSync(this.sessionDir)) {
       mkdirSync(this.sessionDir, { recursive: true });

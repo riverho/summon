@@ -8,20 +8,70 @@ import { StructuredToolInterface } from '@langchain/core/tools';
 import { Runnable } from '@langchain/core/runnables';
 import { z } from 'zod';
 
-export const DEFAULT_PROVIDER = 'openai';
-export const DEFAULT_MODEL = 'gpt-4o';
+// Provider priority order (first match wins)
+const PROVIDER_PRIORITY = ['openrouter', 'openai', 'anthropic', 'google', 'xai', 'ollama'];
 
-// Fast model variants by provider for lightweight tasks like summarization
-const FAST_MODELS: Record<string, string> = {
+// Default exports for backwards compatibility
+export const DEFAULT_PROVIDER = 'openrouter';
+export const DEFAULT_MODEL = 'openai/gpt-4o-mini';
+
+// Default models by provider
+const DEFAULT_MODELS: Record<string, string> = {
+  openrouter: 'openai/gpt-4o-mini',
   openai: 'gpt-4o-mini',
-  anthropic: 'claude-haiku-4-20250514',
-  google: 'gemini-2.5-flash',
-  xai: 'grok-3',
+  anthropic: 'claude-3-5-sonnet-20241022',
+  google: 'gemini-2.0-flash',
+  xai: 'grok-2',
+  ollama: 'llama3.2',
+};
+
+// Fast model variants for lightweight tasks
+const FAST_MODELS: Record<string, string> = {
+  openrouter: 'openai/gpt-4o-mini',
+  openai: 'gpt-4o-mini',
+  anthropic: 'claude-3-haiku-20240307',
+  google: 'gemini-2.0-flash',
+  xai: 'grok-2-mini',
+  ollama: 'llama3.2',
 };
 
 /**
+ * Detect which provider to use based on env vars
+ */
+function detectProvider(): string {
+  // Check for explicit override
+  const explicitProvider = process.env.DEFAULT_LLM_PROVIDER;
+  if (explicitProvider && PROVIDER_PRIORITY.includes(explicitProvider)) {
+    return explicitProvider;
+  }
+
+  // Check in priority order
+  if (process.env.OPENROUTER_API_KEY) return 'openrouter';
+  if (process.env.OPENAI_API_KEY) return 'openai';
+  if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
+  if (process.env.GOOGLE_API_KEY) return 'google';
+  if (process.env.XAI_API_KEY) return 'xai';
+  if (process.env.OLLAMA_BASE_URL) return 'ollama';
+
+  throw new Error('No LLM provider configured. Set OPENROUTER_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY, XAI_API_KEY, or OLLAMA_BASE_URL');
+}
+
+/**
+ * Get the model name for a provider
+ */
+function getModelForProvider(provider: string, requestedModel?: string): string {
+  if (requestedModel) return requestedModel;
+  
+  // Check for provider-specific model env var
+  const modelEnvVar = `${provider.toUpperCase()}_MODEL`;
+  const envModel = process.env[modelEnvVar];
+  if (envModel) return envModel;
+  
+  return DEFAULT_MODELS[provider] || 'gpt-4o-mini';
+}
+
+/**
  * Gets the fast model variant for the given provider.
- * Falls back to the provided model if no fast variant is configured.
  */
 export function getFastModel(modelProvider: string, fallbackModel: string): string {
   return FAST_MODELS[modelProvider] ?? fallbackModel;
@@ -55,76 +105,108 @@ function getApiKey(envVar: string, providerName: string): string {
   return apiKey;
 }
 
-function buildOpenAIConfiguration(): { baseURL?: string; defaultHeaders?: Record<string, string> } {
-  const baseURL = process.env.OPENAI_BASE_URL?.trim();
-  const httpReferer = process.env.OPENAI_HTTP_REFERER?.trim();
-  const xTitle = process.env.OPENAI_X_TITLE?.trim();
-  const defaultHeaders: Record<string, string> = {};
-
-  if (httpReferer) defaultHeaders['HTTP-Referer'] = httpReferer;
-  if (xTitle) defaultHeaders['X-Title'] = xTitle;
-
-  return {
-    ...(baseURL ? { baseURL } : {}),
-    ...(Object.keys(defaultHeaders).length > 0 ? { defaultHeaders } : {}),
-  };
-}
-
-function buildAnthropicClientOptions(): { baseURL?: string } | undefined {
-  const baseURL = process.env.ANTHROPIC_BASE_URL?.trim();
-  if (!baseURL) return undefined;
-  return { baseURL };
-}
-
-const MODEL_PROVIDERS: Record<string, ModelFactory> = {
-  'claude-': (name, opts) =>
-    new ChatAnthropic({
-      model: name,
-      ...opts,
-      apiKey: getApiKey('ANTHROPIC_API_KEY', 'Anthropic'),
-      ...(buildAnthropicClientOptions() ? { clientOptions: buildAnthropicClientOptions() } : {}),
-    }),
-  'gemini-': (name, opts) =>
-    new ChatGoogleGenerativeAI({
-      model: name,
-      ...opts,
-      apiKey: getApiKey('GOOGLE_API_KEY', 'Google'),
-    }),
-  'grok-': (name, opts) =>
-    new ChatOpenAI({
-      model: name,
-      ...opts,
-      apiKey: getApiKey('XAI_API_KEY', 'xAI'),
-      configuration: {
-        baseURL: 'https://api.x.ai/v1',
-      },
-    }),
-  'ollama:': (name, opts) =>
-    new ChatOllama({
-      model: name.replace(/^ollama:/, ''),
-      ...opts,
-      ...(process.env.OLLAMA_BASE_URL ? { baseUrl: process.env.OLLAMA_BASE_URL } : {}),
-    }),
-};
-
-const DEFAULT_MODEL_FACTORY: ModelFactory = (name, opts) =>
-  new ChatOpenAI({
+// Provider factories
+const PROVIDER_FACTORIES: Record<string, ModelFactory> = {
+  openrouter: (name, opts) => new ChatOpenAI({
     model: name,
     ...opts,
-    apiKey: process.env.OPENAI_API_KEY,
-    ...(Object.keys(buildOpenAIConfiguration()).length > 0
-      ? { configuration: buildOpenAIConfiguration() }
-      : {}),
-  });
+    apiKey: getApiKey('OPENROUTER_API_KEY', 'OpenRouter'),
+    configuration: {
+      baseURL: 'https://openrouter.ai/api/v1',
+      defaultHeaders: {
+        'HTTP-Referer': process.env.OPENROUTER_HTTP_REFERER || 'https://summon.ai',
+        'X-Title': process.env.OPENROUTER_X_TITLE || 'Summon',
+      },
+    },
+  }),
+  
+  openai: (name, opts) => new ChatOpenAI({
+    model: name,
+    ...opts,
+    apiKey: getApiKey('OPENAI_API_KEY', 'OpenAI'),
+    ...(process.env.OPENAI_BASE_URL ? {
+      configuration: {
+        baseURL: process.env.OPENAI_BASE_URL,
+        ...(process.env.OPENAI_HTTP_REFERER ? {
+          defaultHeaders: {
+            'HTTP-Referer': process.env.OPENAI_HTTP_REFERER,
+            ...(process.env.OPENAI_X_TITLE ? { 'X-Title': process.env.OPENAI_X_TITLE } : {}),
+          },
+        } : {}),
+      },
+    } : {}),
+  }),
+  
+  anthropic: (name, opts) => new ChatAnthropic({
+    model: name,
+    ...opts,
+    apiKey: getApiKey('ANTHROPIC_API_KEY', 'Anthropic'),
+    ...(process.env.ANTHROPIC_BASE_URL ? {
+      clientOptions: { baseURL: process.env.ANTHROPIC_BASE_URL },
+    } : {}),
+  }),
+  
+  google: (name, opts) => new ChatGoogleGenerativeAI({
+    model: name,
+    ...opts,
+    apiKey: getApiKey('GOOGLE_API_KEY', 'Google'),
+  }),
+  
+  xai: (name, opts) => new ChatOpenAI({
+    model: name,
+    ...opts,
+    apiKey: getApiKey('XAI_API_KEY', 'xAI'),
+    configuration: {
+      baseURL: 'https://api.x.ai/v1',
+    },
+  }),
+  
+  ollama: (name, opts) => new ChatOllama({
+    model: name,
+    ...opts,
+    baseUrl: process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434',
+  }),
+};
 
+// Backwards compatibility: model name prefixes for explicit routing
+const MODEL_PREFIXES: Record<string, string> = {
+  'claude-': 'anthropic',
+  'gemini-': 'google',
+  'grok-': 'xai',
+  'ollama:': 'ollama',
+  // OpenRouter prefixes
+  'openai/': 'openrouter',
+  'anthropic/': 'openrouter',
+  'google/': 'openrouter',
+  'x-ai/': 'openrouter',
+  'z-ai/': 'openrouter',
+};
+
+/**
+ * Get the appropriate chat model
+ */
 export function getChatModel(
-  modelName: string = DEFAULT_MODEL,
+  modelName?: string,
   streaming: boolean = false
 ): BaseChatModel {
   const opts: ModelOpts = { streaming };
-  const prefix = Object.keys(MODEL_PROVIDERS).find((p) => modelName.startsWith(p));
-  const factory = prefix ? MODEL_PROVIDERS[prefix] : DEFAULT_MODEL_FACTORY;
-  return factory(modelName, opts);
+  
+  // Check for explicit provider override via model prefix
+  if (modelName) {
+    for (const [prefix, provider] of Object.entries(MODEL_PREFIXES)) {
+      if (modelName.startsWith(prefix)) {
+        const factory = PROVIDER_FACTORIES[provider];
+        return factory(modelName, opts);
+      }
+    }
+  }
+  
+  // Auto-detect provider from env
+  const provider = detectProvider();
+  const model = getModelForProvider(provider, modelName);
+  const factory = PROVIDER_FACTORIES[provider];
+  
+  return factory(model, opts);
 }
 
 interface CallLlmOptions {
@@ -136,7 +218,12 @@ interface CallLlmOptions {
 }
 
 export async function callLlm(prompt: string, options: CallLlmOptions = {}): Promise<unknown> {
-  const { model = DEFAULT_MODEL, systemPrompt = '', outputSchema, tools, signal } = options;
+  const { model: requestedModel, systemPrompt = '', outputSchema, tools, signal } = options;
+
+  // Detect provider and get model
+  const provider = detectProvider();
+  const model = getModelForProvider(provider, requestedModel);
+
   const finalSystemPrompt = escapeTemplateBraces(systemPrompt);
 
   const promptTemplate = ChatPromptTemplate.fromMessages([

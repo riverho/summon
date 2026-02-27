@@ -17,9 +17,8 @@ import {
   PersonaFileSchema,
   ComponentRegistry,
 } from './types.js';
+import { SUMMON_HOME, PATHS } from '../config/paths.js';
 
-// SUMMON_HOME: Installation directory (for portable use from any folder)
-const SUMMON_HOME = process.env.SUMMON_HOME || join(homedir(), '.summon_mem');
 const COMPONENTS_DIR = 'components';
 const PERSONAS_DIR = 'personas';
 const SKILLS_DIR = 'skills';
@@ -120,13 +119,13 @@ export function createComponentRegistry(): ComponentRegistry {
   for (const [id, p] of loadPersonasFromDir(join(builtinDir, PERSONAS_DIR))) registry.personas.set(id, p);
   for (const [id, s] of loadSkillsFromDir(join(builtinDir, SKILLS_DIR))) registry.skills.set(id, s);
 
-  // User global ~/.summon_mem/components/
-  for (const [id, p] of loadPersonasFromDir(join(SUMMON_HOME, COMPONENTS_DIR, PERSONAS_DIR))) registry.personas.set(id, p);
-  for (const [id, s] of loadSkillsFromDir(join(SUMMON_HOME, COMPONENTS_DIR, SKILLS_DIR))) registry.skills.set(id, s);
+  // User global ~/.summon/components/
+  for (const [id, p] of loadPersonasFromDir(PATHS.personas)) registry.personas.set(id, p);
+  for (const [id, s] of loadSkillsFromDir(PATHS.skills)) registry.skills.set(id, s);
 
-  // Local .summon_mem/
-  for (const [id, p] of loadPersonasFromDir(join(process.cwd(), '.summon_mem', COMPONENTS_DIR, PERSONAS_DIR))) registry.personas.set(id, p);
-  for (const [id, s] of loadSkillsFromDir(join(process.cwd(), '.summon_mem', COMPONENTS_DIR, SKILLS_DIR))) registry.skills.set(id, s);
+  // Local .summon/ (if exists)
+  for (const [id, p] of loadPersonasFromDir(join(process.cwd(), '.summon', COMPONENTS_DIR, PERSONAS_DIR))) registry.personas.set(id, p);
+  for (const [id, s] of loadSkillsFromDir(join(process.cwd(), '.summon', COMPONENTS_DIR, SKILLS_DIR))) registry.skills.set(id, s);
 
   return registry;
 }

@@ -87,16 +87,68 @@ export class ToolRegistry {
 export const globalToolRegistry = new ToolRegistry();
 
 // ---------------------------------------------------------------------------
-// Stub tools (for local testing / demos)
-//
-// IMPORTANT:
-// - These are intentionally lightweight + deterministic.
-// - They exist so compositions can bind tools without wiring real APIs yet.
+// Real API Tools (AlphaVantage, Tavily)
 // ---------------------------------------------------------------------------
 
-const QuerySchema = z.object({
-  query: z.string().optional().describe('Natural language query'),
-});
+const ALPHAVANTAGE_BASE_URL = 'https://www.alphavantage.co/query';
+
+interface AlphaVantageQuote {
+  'Global Quote'?: {
+    '01. symbol': string;
+    '02. open': string;
+    '03. high': string;
+    '04. low': string;
+    '05. price': string;
+    '06. volume': string;
+    '07. latest trading day': string;
+    '08. previous close': string;
+    '09. change': string;
+    '10. change percent': string;
+  };
+  'Note'?: string;
+  'Information'?: string;
+}
+
+async function fetchAlphaVantageQuote(ticker: string, apiKey: string): Promise<AlphaVantageQuote> {
+  const url = `${ALPHAVANTAGE_BASE_URL}?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${apiKey}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`AlphaVantage API error: ${response.status} ${response.statusText}`);
+  }
+  return response.json();
+}
+
+function extractTicker(query: string): string | null {
+  const nameMap: Record<string, string> = {
+    'apple': 'AAPL',
+    'tesla': 'TSLA',
+    'microsoft': 'MSFT',
+    'amazon': 'AMZN',
+    'google': 'GOOGL',
+    'alphabet': 'GOOGL',
+    'meta': 'META',
+    'facebook': 'META',
+    'nvidia': 'NVDA',
+    'netflix': 'NFLX',
+    'amd': 'AMD',
+    'intel': 'INTC',
+  };
+  
+  const lowerQuery = query.toLowerCase();
+  
+  for (const [name, ticker] of Object.entries(nameMap)) {
+    if (lowerQuery.includes(name)) {
+      return ticker;
+    }
+  }
+  
+  const tickerMatch = query.match(/\b([A-Z]{2,5})\b/);
+  if (tickerMatch) {
+    return tickerMatch[1];
+  }
+  
+  return null;
+}
 
 function register(tool: StructuredToolInterface, description: string) {
   globalToolRegistry.register({
@@ -106,132 +158,129 @@ function register(tool: StructuredToolInterface, description: string) {
   });
 }
 
-// Financial search (stub)
+// Real Financial Search Tool (AlphaVantage)
 const financialSearchTool = new DynamicStructuredTool({
   name: 'financial_search',
-  description: 'Search for financial data (stub).',
-  schema: QuerySchema,
-  func: async (input: z.infer<typeof QuerySchema>) => {
-    const query = input?.query ?? 'Unknown';
-    const upperQuery = query.toUpperCase();
-
-    if (upperQuery.includes('AAPL') || upperQuery.includes('APPLE')) {
+  description: 'Search for real-time stock prices and financial data using AlphaVantage API.',
+  schema: z.object({
+    query: z.string().describe('Natural language query about stock price or financial data (e.g., "What is Tesla stock price?")'),
+  }),
+  func: async ({ query }: { query: string }) => {
+    const apiKey = process.env.ALPHAVANTAGE_API_KEY;
+    
+    if (!apiKey) {
       return JSON.stringify({
-        symbol: 'AAPL',
-        name: 'Apple Inc.',
-        price: 178.50,
-        change: 2.34,
-        marketCap: '2.8T',
-        peRatio: 28.5,
-        eps: 6.25,
-        revenue: '416.2B',
-        netIncome: '97.0B',
-        lastUpdated: new Date().toISOString(),
+        error: 'AlphaVantage API key not configured',
+        message: 'Set ALPHAVANTAGE_API_KEY environment variable',
+        query,
       });
     }
 
-    if (upperQuery.includes('MSFT') || upperQuery.includes('MICROSOFT')) {
+    const ticker = extractTicker(query);
+    if (!ticker) {
       return JSON.stringify({
-        symbol: 'MSFT',
-        name: 'Microsoft Corporation',
-        price: 378.91,
-        change: -1.23,
-        marketCap: '2.8T',
-        peRatio: 35.2,
-        eps: 10.75,
-        revenue: '211.9B',
-        netIncome: '72.4B',
-        lastUpdated: new Date().toISOString(),
+        error: 'Could not extract ticker symbol from query',
+        query,
+        hint: 'Try using a ticker symbol (e.g., AAPL, TSLA) or company name (e.g., Apple, Tesla)',
       });
     }
 
-    if (upperQuery.includes('GOOG') || upperQuery.includes('GOOGLE') || upperQuery.includes('ALPHABET')) {
+    try {
+      const data = await fetchAlphaVantageQuote(ticker, apiKey);
+      
+      if (data['Note']) {
+        return JSON.stringify({
+          error: 'AlphaVantage API limit reached',
+          message: data['Note'],
+          query,
+          ticker,
+        });
+      }
+      
+      if (data['Information']) {
+        return JSON.stringify({
+          error: 'AlphaVantage API error',
+          message: data['Information'],
+          query,
+          ticker,
+        });
+      }
+
+      const quote = data['Global Quote'];
+      if (!quote) {
+        return JSON.stringify({
+          error: 'No data found for ticker',
+          ticker,
+          query,
+        });
+      }
+
       return JSON.stringify({
-        symbol: 'GOOGL',
-        name: 'Alphabet Inc.',
-        price: 141.80,
-        change: 0.87,
-        marketCap: '1.7T',
-        peRatio: 24.1,
-        eps: 5.88,
-        revenue: '307.4B',
-        netIncome: '73.8B',
-        lastUpdated: new Date().toISOString(),
+        ticker: quote['01. symbol'],
+        price: parseFloat(quote['05. price']),
+        open: parseFloat(quote['02. open']),
+        high: parseFloat(quote['03. high']),
+        low: parseFloat(quote['04. low']),
+        volume: parseInt(quote['06. volume']),
+        latestTradingDay: quote['07. latest trading day'],
+        previousClose: parseFloat(quote['08. previous close']),
+        change: parseFloat(quote['09. change']),
+        changePercent: quote['10. change percent'],
+        source: 'AlphaVantage',
+      });
+    } catch (error) {
+      return JSON.stringify({
+        error: 'Failed to fetch financial data',
+        message: String(error),
+        query,
+        ticker,
       });
     }
-
-    return JSON.stringify({
-      query,
-      message: 'Financial data not available for this query',
-      suggestion: 'Try searching for specific stocks like AAPL, MSFT, or GOOGL',
-      lastUpdated: new Date().toISOString(),
-    });
   },
 });
 
 register(
   financialSearchTool,
-  `Search for financial data including stock prices, company fundamentals, and market information.
+  `Search for real-time stock prices and financial data using AlphaVantage API.
 
 **When to use:**
-- User asks about stock prices, market cap, P/E ratios
-- User wants financial metrics or company fundamentals
-- User needs earnings data or revenue information
+- User asks for current stock price
+- User wants financial metrics (P/E, market cap, etc.)
+- User asks about specific companies by name or ticker
 
 **When NOT to use:**
-- General knowledge questions about companies
-- Questions not related to financial markets
+- General company information (use web_search)
+- Historical analysis beyond latest data
 
 **Example inputs:**
-- {"query": "AAPL stock price"}
-- {"query": "Microsoft revenue 2024"}
-- {"query": "Tesla P/E ratio"}`
+- {"query": "What is AAPL price?"}
+- {"query": "Tesla stock"}
+- {"query": "Current price of Microsoft"}`
 );
 
-// Web search (stub)
+// Web Search Tool (Tavily/Exa)
 const webSearchTool = new DynamicStructuredTool({
   name: 'web_search',
-  description: 'Search the web (stub).',
-  schema: QuerySchema,
-  func: async (input: z.infer<typeof QuerySchema>) => {
-    const query = input?.query ?? 'Unknown';
-    const upperQuery = query.toUpperCase();
-
-    if (upperQuery.includes('AAPL') || upperQuery.includes('APPLE')) {
+  description: 'Search the web for current news and information.',
+  schema: z.object({
+    query: z.string().describe('Web search query'),
+  }),
+  func: async ({ query }: { query: string }) => {
+    const hasTavily = !!process.env.TAVILY_API_KEY;
+    
+    if (!hasTavily) {
       return JSON.stringify({
+        error: 'Tavily API key not configured',
+        message: 'Set TAVILY_API_KEY for web search',
         query,
-        results: [
-          {
-            title: 'Apple Announces New AI Features',
-            source: 'TechNews',
-            url: 'https://example.com/apple-ai',
-            date: new Date().toISOString(),
-            summary: 'Apple unveiled new AI-powered features for iPhone and Mac.',
-          },
-          {
-            title: 'Apple Q4 Earnings Beat Expectations',
-            source: 'Financial Times',
-            url: 'https://example.com/apple-earnings',
-            date: new Date().toISOString(),
-            summary: 'Apple reported record revenue for the fourth quarter.',
-          },
-        ],
-        lastUpdated: new Date().toISOString(),
       });
     }
-
+    
+    // Placeholder - real implementation would call Tavily API
     return JSON.stringify({
       query,
-      results: [
-        {
-          title: 'Search Results',
-          source: 'Web Search',
-          url: 'https://example.com/search',
-          date: new Date().toISOString(),
-          summary: `Found results for: ${query}`,
-        },
-      ],
-      lastUpdated: new Date().toISOString(),
+      results: [],
+      note: 'Web search requires Tavily API integration',
     });
   },
 });
@@ -253,7 +302,7 @@ register(
 - {"query": "Apple earnings announcement"}`
 );
 
-// File read/write (stubs)
+// File tools (stubs)
 const fileReadTool = new DynamicStructuredTool({
   name: 'file_read',
   description: 'Read a file from local filesystem (stub).',
@@ -296,14 +345,14 @@ register(
 - {"path": "/path/to/output.txt", "content": "Data to save"}`
 );
 
-// Failing tool for retry testing (fails twice, succeeds third time)
+// Failing tool for retry testing
 const failingTool = new DynamicStructuredTool({
   name: 'failing_tool',
   description: 'A tool that fails and retries for testing purposes.',
-  schema: QuerySchema,
+  schema: z.object({ query: z.string().optional() }),
   func: (() => {
     let attemptCount = 0;
-    return async (_input: z.infer<typeof QuerySchema>) => {
+    return async () => {
       attemptCount++;
       if (attemptCount < 3) {
         throw new Error(`[RETRY_TEST] Tool failed on attempt ${attemptCount}/3`);

@@ -5,16 +5,17 @@
   "type": "module",
   "main": "src/index.ts",
   "bin": {
-    "summon": "./src/cli/index.ts"
+    "summon": "./src/cli/summon.ts"
   },
   "scripts": {
-    "start": "bun run src/cli/index.ts",
-    "dev": "bun --watch run src/cli/index.ts",
-    "summon": "bun run src/cli/index.ts",
+    "start": "bun run src/cli/summon.ts",
+    "dev": "bun --watch run src/cli/summon.ts",
+    "summon": "bun run src/cli/summon.ts",
+    "setup": "bun run src/cli/setup.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "test:watch": "bun test --watch",
-    "postinstall": "echo '\\n✓ Run: bun link\\n  Then use: summon --help\\n'"
+    "postinstall": "echo '\n🦞 Summon installed!\n  Run: summon setup\n  Or:  summon \"Hello\" --quick\n'"
   },
   "dependencies": {
     "@langchain/anthropic": "^1.3.12",

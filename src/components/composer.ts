@@ -192,8 +192,6 @@ ${toolsPrompt}
 
 ## Response Format
 
-${namePrefix} Prefix: Start your response with ${namePrefix} for conversation clarity.
-
 - Keep responses concise and direct
 - Use tables for comparative data
 - Do not use markdown headers or *italics* - use **bold** sparingly for emphasis

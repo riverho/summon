@@ -2,15 +2,15 @@
  * DecisionPoint Store
  * 
  * File-based storage for decision points and chat threads.
- * Structure: ~/.summon_mem/decisions/{sessionId}/{pointId}.json
+ * Structure: ~/.summon/decisions/{sessionId}/{pointId}.json
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { dirname, join } from 'path';
-import { homedir } from 'os';
 import type { DecisionPoint, DecisionFilter, Message, HumanDecision } from './types';
+import { PATHS } from '../config/paths.js';
 
-const BASE_PATH = join(homedir(), '.summon_mem', 'decisions');
+const BASE_PATH = PATHS.decisions;
 
 function ensureDir(path: string): void {
   if (!existsSync(path)) {

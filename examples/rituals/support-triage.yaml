@@ -1,0 +1,58 @@
+# Support Ticket Triage with Auto-Escalation
+# Routes tickets based on complexity and sentiment
+
+name: support-triage
+version: 1.0.0
+description: Intelligent support ticket routing
+
+steps:
+  - id: classify
+    name: Ticket Classification
+    agent: classifier
+    description: Analyze ticket complexity and sentiment
+    complexity: simple
+    
+  - id: auto-resolve
+    name: Auto Resolution
+    agent: support-bot
+    description: Attempt automated resolution
+    complexity: moderate
+    dependsOn: [classify]
+    
+  - id: human-review
+    name: Human Agent Review
+    agent: support-human
+    description: Human agent handles complex case
+    complexity: complex
+    dependsOn: [classify]
+    
+  - id: escalate
+    name: Escalation
+    agent: escalation-agent
+    description: Escalate to specialist team
+    complexity: complex
+    dependsOn: [classify]
+
+conditions:
+  - id: complexity-check
+    from: classify
+    condition: "complexity == 'high'"
+    then: escalate           # High complexity → immediate escalation
+    else: auto-resolve       # Low/medium → try auto-resolve
+    
+  - id: sentiment-check
+    from: classify
+    condition: "sentiment == 'frustrated'"
+    then: human-review       # Frustrated customer → human touch
+    else: auto-resolve
+    
+  - id: resolution-check
+    from: auto-resolve
+    condition: "resolved == true"
+    then: complete           # Done!
+    else: human-review       # Bot failed → human needed
+
+evaluation:
+  model: default
+  timeout: 2s               # Fast triage
+  max_retries: 1

@@ -18,6 +18,10 @@ skills:
       You review content for quality and policy compliance.
       Be thorough but fair. Flag any concerns clearly.
 
+model:
+  primary: z-ai/glm-5
+  provider: openrouter
+
 # Multi-layer content validation
 outputGuardrails:
   # Check for required content markers

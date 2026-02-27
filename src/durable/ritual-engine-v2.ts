@@ -1,17 +1,10 @@
-// Ritual Engine v2 — Integrated with AgentFactory + CreditSystem
-// Full pay tier support, real OpenClaw spawning, and cost tracking
+// Ritual Engine v2 — Conditional Edge Support
+// Extends the base RitualEngine with branching conditions
 
 import {
-  AgentFactory,
-  UserTier,
-  ProvisionDecision,
-  SpawnEvent,
-  CompleteEvent
-} from '../factory/index.js';
-import { CreditSystem } from '../billing/index.js';
-import {
+  AgentPool,
   ContextManager,
-  CheckpointManager
+  CheckpointManager,
 } from './index.js';
 import {
   MicroTask,
@@ -19,35 +12,25 @@ import {
   SubAgentResult,
   StateMutation,
   Checkpoint,
-  IDEType
+  IDEType,
 } from './types.js';
 import { MetricsCollector } from '../observability/collector.js';
+import {
+  ConditionEngine,
+  Condition,
+  ConditionContext,
+  ConditionTrace,
+  EvaluationConfig,
+  StepResult,
+} from '../conditions/index.js';
 import * as path from 'path';
 import * as os from 'os';
 
 // ============================================================================
-// Types
+// Extended Types with Condition Support
 // ============================================================================
 
-export interface Ritual {
-  id: string;
-  goal: string;
-  state: 'pending' | 'running' | 'paused' | 'completed' | 'failed';
-  context: ContextManager;
-  tasks: RitualTask[];
-  metadata: {
-    createdAt: number;
-    startedAt?: number;
-    completedAt?: number;
-    totalTokensUsed: number;
-    estimatedCost: number;
-    actualCost: number;
-    userId: string;
-    tier: UserTier;
-  };
-}
-
-export interface RitualTask {
+export interface RitualTaskV2 {
   id: string;
   type: string;
   description: string;
@@ -62,288 +45,357 @@ export interface RitualTask {
   startedAt?: number;
   completedAt?: number;
   error?: string;
-  estimatedCost: number;
-  actualCost: number;
+  iterationCount?: number; // Track how many times this step has been visited
 }
 
-export interface RitualPlan {
+export interface RitualV2 {
+  id: string;
+  goal: string;
+  state: 'pending' | 'running' | 'paused' | 'completed' | 'failed';
+  context: ContextManager;
+  tasks: RitualTaskV2[];
+  conditions: Condition[];
+  conditionResults: Map<string, { outcome: 'then' | 'else'; timestamp: number }>;
+  executionPath: string[]; // Record of step IDs in execution order
+  metadata: {
+    createdAt: number;
+    startedAt?: number;
+    completedAt?: number;
+    totalTokensUsed: number;
+    estimatedCost: number;
+    conditionEvaluations: number;
+    maxIterations: number; // Prevent infinite loops
+  };
+}
+
+export interface RitualPlanV2 {
   goal: string;
   tasks: Array<{
     type: string;
     description: string;
     complexity: TaskComplexity['level'];
     dependsOn?: string[];
-    estimatedTokens?: number;
   }>;
+  conditions?: Condition[];
+  evaluation?: EvaluationConfig;
 }
 
-export interface RitualOptions {
+export interface RitualOptionsV2 {
   checkpointDir?: string;
   autoCheckpointInterval?: number;
   maxConcurrentTasks?: number;
   defaultTaskTimeout?: number;
-  onTaskComplete?: (task: RitualTask, result: SubAgentResult) => void;
+  maxIterations?: number; // Max total steps to prevent infinite loops
+  onTaskComplete?: (task: RitualTaskV2, result: SubAgentResult) => void;
   onCheckpoint?: (checkpoint: Checkpoint) => void;
-  onCostUpdate?: (ritualId: string, actualCost: number, remainingCredits: number) => void;
+  onConditionEvaluated?: (trace: ConditionTrace, ritual: RitualV2) => void;
+  traceConditions?: boolean; // Enable condition tracing
+}
+
+export interface RitualExecutionResult {
+  ritualId: string;
+  success: boolean;
+  finalOutput?: unknown;
+  executionPath: string[];
+  totalSteps: number;
+  conditionEvaluations: number;
+  iterationsByStep: Record<string, number>;
+  traces?: ConditionTrace[];
+  error?: string;
 }
 
 // ============================================================================
-// Ritual Engine v2
+// Ritual Engine v2 with Conditions
 // ============================================================================
 
 export class RitualEngineV2 {
-  private factory: AgentFactory;
-  private creditSystem: CreditSystem;
+  private pool: AgentPool;
   private checkpointManager: CheckpointManager;
   private metricsCollector: MetricsCollector;
-  private rituals: Map<string, Ritual> = new Map();
-  private options: Required<RitualOptions>;
+  private conditionEngine: ConditionEngine;
+  private rituals: Map<string, RitualV2> = new Map();
+  private options: Required<RitualOptionsV2>;
+  private stepResults: Map<string, StepResult> = new Map();
 
-  constructor(
-    factory: AgentFactory,
-    creditSystem: CreditSystem,
-    options: RitualOptions = {}
-  ) {
-    this.factory = factory;
-    this.creditSystem = creditSystem;
+  constructor(options: RitualOptionsV2 = {}) {
     this.options = {
-      checkpointDir: options.checkpointDir || path.join(os.homedir(), '.summon', 'rituals'),
+      checkpointDir:
+        options.checkpointDir ||
+        path.join(os.homedir(), '.summon', 'rituals'),
       autoCheckpointInterval: options.autoCheckpointInterval || 60000,
       maxConcurrentTasks: options.maxConcurrentTasks || 5,
       defaultTaskTimeout: options.defaultTaskTimeout || 300000,
+      maxIterations: options.maxIterations || 100,
       onTaskComplete: options.onTaskComplete || (() => {}),
       onCheckpoint: options.onCheckpoint || (() => {}),
-      onCostUpdate: options.onCostUpdate || (() => {})
+      onConditionEvaluated: options.onConditionEvaluated || (() => {}),
+      traceConditions: options.traceConditions ?? false,
     };
 
-    this.checkpointManager = new CheckpointManager(this.options.checkpointDir);
-    this.metricsCollector = new MetricsCollector(path.join(os.homedir(), '.summon', 'metrics'));
-
-    // Wire up factory events
-    this.factory = new AgentFactory({
-      tier: creditSystem.getTier(),
-      creditBalance: creditSystem.getBalance(),
-      onProvision: (decision) => this.handleProvisionDecision(decision),
-      onSpawn: (event) => this.handleSpawnEvent(event),
-      onComplete: (event) => this.handleCompleteEvent(event)
+    this.pool = new AgentPool({
+      onRoutingDecision: (decision) => {
+        this.metricsCollector.recordRouting({
+          timestamp: Date.now(),
+          taskId: decision.taskId,
+          ritualId: '',
+          complexity: decision.complexity,
+          routedTo: decision.routedTo,
+          reason: decision.reason,
+          estimatedCost: this.calculateEstimatedCost(
+            decision.routedTo,
+            decision.complexity.estimatedTokens
+          ),
+        });
+      },
+      onSubAgentEvent: (event) => {
+        if (event.type === 'spawned') {
+          this.metricsCollector.recordSubAgentSpawned(
+            event.ritualId,
+            event.taskId,
+            event.agentType,
+            event.sessionId!
+          );
+        } else if (event.type === 'completed') {
+          this.metricsCollector.recordSubAgentCompleted(
+            event.ritualId,
+            event.taskId,
+            event.agentType,
+            event.durationMs!,
+            event.tokensUsed!
+          );
+        } else if (event.type === 'failed') {
+          this.metricsCollector.recordSubAgentFailed(
+            event.ritualId,
+            event.taskId,
+            event.agentType,
+            event.errorCode!,
+            0
+          );
+        }
+      },
     });
+
+    this.checkpointManager = new CheckpointManager(this.options.checkpointDir);
+    this.metricsCollector = new MetricsCollector(
+      path.join(os.homedir(), '.summon', 'metrics')
+    );
+    this.conditionEngine = new ConditionEngine();
   }
 
-  // =======================================================================
+  // ========================================================================
   // Ritual Lifecycle
-  // =======================================================================
+  // ========================================================================
 
   async createRitual(
     goal: string,
-    userId: string,
-    plan?: RitualPlan
-  ): Promise<Ritual> {
-    const id = `ritual-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    plan?: RitualPlanV2,
+    evaluationConfig?: EvaluationConfig
+  ): Promise<RitualV2> {
+    const id = `ritual-v2-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 7)}`;
 
-    const ritual: Ritual = {
+    const ritual: RitualV2 = {
       id,
       goal,
       state: 'pending',
       context: new ContextManager({ goal }),
       tasks: [],
+      conditions: plan?.conditions || [],
+      conditionResults: new Map(),
+      executionPath: [],
       metadata: {
         createdAt: Date.now(),
         totalTokensUsed: 0,
         estimatedCost: 0,
-        actualCost: 0,
-        userId,
-        tier: this.creditSystem.getTier()
-      }
+        conditionEvaluations: 0,
+        maxIterations: this.options.maxIterations,
+      },
     };
 
     if (plan) {
-      // Calculate total estimated cost
-      let totalEstimated = 0;
-
+      // First pass: create all tasks
       for (const taskPlan of plan.tasks) {
-        const task = this.createTask(taskPlan);
-        ritual.tasks.push(task);
-        totalEstimated += task.estimatedCost;
+        ritual.tasks.push(this.createTask(taskPlan));
       }
 
-      ritual.metadata.estimatedCost = totalEstimated;
-
-      // Map dependencies
+      // Second pass: map dependsOn from types to IDs
       const typeToId = new Map<string, string>();
       for (const task of ritual.tasks) {
         typeToId.set(task.type, task.id);
       }
 
       for (const task of ritual.tasks) {
-        const planTask = plan.tasks.find(t => t.type === task.type);
-        if (planTask?.dependsOn) {
-          task.dependsOn = planTask.dependsOn
-            .map(depType => typeToId.get(depType))
-            .filter((id): id is string => !!id);
+        if (task.dependsOn && task.dependsOn.length > 0) {
+          task.dependsOn = task.dependsOn
+            .map((depType) => {
+              const depId = typeToId.get(depType);
+              if (!depId) {
+                console.warn(
+                  `Warning: Dependency '${depType}' not found for task '${task.type}'`
+                );
+              }
+              return depId || depType;
+            })
+            .filter(Boolean) as string[];
         }
       }
+    }
 
-      // Check if user has enough credits (free tier only)
-      const tier = this.creditSystem.getTier();
-      if (tier === 'free') {
-        const balance = this.creditSystem.getBalance();
-        if (balance < totalEstimated) {
-          console.warn(`⚠️  Warning: Estimated cost ($${totalEstimated.toFixed(2)}) exceeds balance ($${balance.toFixed(2)})`);
-          console.warn(`   Ritual may fail mid-execution. Consider upgrading to paid tier.`);
-        }
-      }
+    // Reinitialize condition engine with ritual-specific config
+    if (evaluationConfig) {
+      this.conditionEngine = new ConditionEngine(evaluationConfig);
     }
 
     this.rituals.set(id, ritual);
     return ritual;
   }
 
-  async startRitual(ritualId: string): Promise<void> {
+  async executeRitual(ritualId: string): Promise<RitualExecutionResult> {
     const ritual = this.rituals.get(ritualId);
-    if (!ritual) throw new Error(`Ritual not found: ${ritualId}`);
+    if (!ritual) {
+      throw new Error(`Ritual not found: ${ritualId}`);
+    }
 
     ritual.state = 'running';
     ritual.metadata.startedAt = Date.now();
+    this.stepResults.clear();
+    this.conditionEngine.clearTraces();
 
-    // Update factory with current credit balance
-    this.factory = new AgentFactory({
-      tier: this.creditSystem.getTier(),
-      creditBalance: this.creditSystem.getBalance(),
-      onProvision: (decision) => this.handleProvisionDecision(decision),
-      onSpawn: (event) => this.handleSpawnEvent(event),
-      onComplete: (event) => this.handleCompleteEvent(event)
-    });
-
-    this.metricsCollector.startRitual(ritual);
+    // Start metrics tracking
+    this.metricsCollector.startRitual(ritual as unknown as import('./ritual-engine.js').Ritual);
 
     try {
-      await this.executeRitual(ritual);
-      this.metricsCollector.completeRitual(ritualId, 'completed');
-      console.log(`\n✅ Ritual completed: ${ritualId}`);
-      console.log(`   Total cost: $${ritual.metadata.actualCost.toFixed(4)}`);
-      console.log(`   Remaining credits: $${this.creditSystem.getBalance().toFixed(2)}`);
-    } catch (err) {
-      this.metricsCollector.completeRitual(ritualId, 'failed');
-      console.error(`\n❌ Ritual failed: ${ritualId}`);
-      throw err;
-    }
-  }
+      let currentStep = this.getFirstStep(ritual);
+      let totalIterations = 0;
 
-  async resumeRitual(ritualId: string): Promise<void> {
-    const checkpoint = this.checkpointManager.load(ritualId);
-    if (!checkpoint) throw new Error(`No checkpoint found for ritual: ${ritualId}`);
+      while (currentStep && totalIterations < this.options.maxIterations) {
+        totalIterations++;
 
-    const ritual = this.rituals.get(ritualId) || await this.createRitual(
-      checkpoint.state.goal as string,
-      'resumed-user'
-    );
+        // Execute the current step
+        const result = await this.executeStep(currentStep, ritual);
 
-    ritual.state = 'running';
-    ritual.context = new ContextManager(checkpoint.state);
+        // Record step result for condition evaluation
+        const stepResult: StepResult = {
+          stepId: currentStep.id,
+          success: result.success,
+          output: result.success ? result.output : result.error,
+          metadata: {
+            tokensUsed: result.metrics.tokensUsed,
+            durationMs: result.metrics.durationMs,
+            model: currentStep.agentId || 'unknown',
+          },
+        };
+        this.stepResults.set(currentStep.id, stepResult);
+        ritual.executionPath.push(currentStep.id);
 
-    // Restore task states
-    for (const taskId of checkpoint.completedTasks) {
-      const task = ritual.tasks.find(t => t.id === taskId);
-      if (task) task.status = 'completed';
-    }
+        // Update task tracking
+        currentStep.iterationCount = (currentStep.iterationCount || 0) + 1;
 
-    for (const mutation of checkpoint.mutations) {
-      ritual.context.applyMutations([mutation], mutation.agentId);
-    }
+        // Save checkpoint after each step
+        await this.saveCheckpoint(ritual);
 
-    await this.executeRitual(ritual);
-  }
+        // Determine next step based on conditions
+        const nextStepId = await this.determineNextStep(
+          currentStep,
+          stepResult,
+          ritual
+        );
 
-  async pauseRitual(ritualId: string): Promise<void> {
-    const ritual = this.rituals.get(ritualId);
-    if (!ritual) return;
+        if (nextStepId === 'complete') {
+          ritual.state = 'completed';
+          ritual.metadata.completedAt = Date.now();
+          break;
+        }
 
-    ritual.state = 'paused';
-    await this.saveCheckpoint(ritual);
-    console.log(`⏸️  Ritual paused: ${ritualId}`);
-  }
+        // Find the next step
+        const nextStep = ritual.tasks.find((t) => t.id === nextStepId);
+        if (!nextStep) {
+          throw new Error(`Next step not found: ${nextStepId}`);
+        }
 
-  getRitual(ritualId: string): Ritual | undefined {
-    return this.rituals.get(ritualId);
-  }
-
-  listRituals(): Ritual[] {
-    return Array.from(this.rituals.values());
-  }
-
-  // =======================================================================
-  // Task Execution
-  // =======================================================================
-
-  private async executeRitual(ritual: Ritual): Promise<void> {
-    const pendingTasks = ritual.tasks.filter(t => t.status === 'pending');
-
-    while (pendingTasks.length > 0) {
-      const readyTasks = pendingTasks.filter(t => this.isReady(t, ritual.tasks));
-
-      if (readyTasks.length === 0) {
-        throw new Error('Deadlock: No tasks ready to execute');
+        currentStep = nextStep;
       }
 
-      const batch = readyTasks.slice(0, this.options.maxConcurrentTasks);
-      await Promise.all(batch.map(task => this.executeTask(task, ritual)));
+      if (totalIterations >= this.options.maxIterations) {
+        ritual.state = 'failed';
+        throw new Error(
+          `Max iterations (${this.options.maxIterations}) reached - possible infinite loop`
+        );
+      }
 
-      // Save checkpoint after each batch
-      await this.saveCheckpoint(ritual);
+      this.metricsCollector.completeRitual(ritualId, 'completed');
 
-      // Update cost tracking
-      this.options.onCostUpdate(
-        ritual.id,
-        ritual.metadata.actualCost,
-        this.creditSystem.getBalance()
-      );
+      // Calculate iterations by step
+      const iterationsByStep: Record<string, number> = {};
+      for (const stepId of ritual.executionPath) {
+        iterationsByStep[stepId] = (iterationsByStep[stepId] || 0) + 1;
+      }
 
-      // Refresh pending list
-      pendingTasks.length = 0;
-      pendingTasks.push(...ritual.tasks.filter(t => t.status === 'pending'));
+      return {
+        ritualId,
+        success: true,
+        finalOutput: this.buildFinalOutput(ritual),
+        executionPath: ritual.executionPath,
+        totalSteps: ritual.executionPath.length,
+        conditionEvaluations: ritual.metadata.conditionEvaluations,
+        iterationsByStep,
+        traces: this.options.traceConditions
+          ? this.conditionEngine.getTraces()
+          : undefined,
+      };
+    } catch (err: any) {
+      ritual.state = 'failed';
+      this.metricsCollector.completeRitual(ritualId, 'failed');
+
+      return {
+        ritualId,
+        success: false,
+        executionPath: ritual.executionPath,
+        totalSteps: ritual.executionPath.length,
+        conditionEvaluations: ritual.metadata.conditionEvaluations,
+        iterationsByStep: {},
+        error: err.message,
+        traces: this.options.traceConditions
+          ? this.conditionEngine.getTraces()
+          : undefined,
+      };
     }
-
-    ritual.state = 'completed';
-    ritual.metadata.completedAt = Date.now();
-    await this.saveCheckpoint(ritual);
   }
 
-  private async executeTask(task: RitualTask, ritual: Ritual): Promise<void> {
+  // ========================================================================
+  // Step Execution
+  // ========================================================================
+
+  private async executeStep(
+    task: RitualTaskV2,
+    ritual: RitualV2
+  ): Promise<SubAgentResult> {
     task.status = 'running';
     task.startedAt = Date.now();
-
-    // Check credits before execution
-    const tier = this.creditSystem.getTier();
-    if (tier === 'free') {
-      const balance = this.creditSystem.getBalance();
-      if (balance < task.estimatedCost) {
-        task.status = 'failed';
-        task.error = `Insufficient credits: $${balance.toFixed(2)} < $${task.estimatedCost.toFixed(2)}`;
-        task.completedAt = Date.now();
-        return;
-      }
-    }
 
     const microTask: MicroTask = {
       type: task.type,
       description: task.description,
       input: task.input,
       timeoutMs: this.options.defaultTaskTimeout,
-      producesMutations: true
+      producesMutations: true,
     };
 
-    // Add dependency outputs to input
+    // Include outputs from dependencies
     const depOutputs = this.getDependencyOutputs(task, ritual.tasks);
     microTask.input = {
-      ...task.input as object,
-      context: depOutputs
+      ...(task.input as object),
+      context: depOutputs,
+      iteration: task.iterationCount || 1,
     };
 
     try {
-      const result = await this.factory.spawnSubAgent(
+      const result = await this.pool.spawnSubAgent(
         microTask,
         task.complexity,
-        ritual.id
+        ritual.id,
+        task.id
       );
 
       task.completedAt = Date.now();
@@ -359,77 +411,108 @@ export class RitualEngineV2 {
           ritual.context.applyMutations(result.mutations, result.agentType);
         }
 
-        // Update ritual metadata
         ritual.metadata.totalTokensUsed += result.metrics.tokensUsed;
-        const actualCost = this.creditSystem.calculateActualCost(
-          result.agentType,
-          result.metrics.tokensUsed
+        ritual.metadata.estimatedCost += this.calculateCost(result);
+
+        this.metricsCollector.recordTaskComplete(
+          task as unknown as import('./ritual-engine.js').RitualTask,
+          result
         );
-        task.actualCost = actualCost;
-        ritual.metadata.actualCost += actualCost;
-
-        // Deduct credits
-        await this.creditSystem.deduct(actualCost, {
-          ritualId: ritual.id,
-          taskId: task.id,
-          agentType: result.agentType,
-          description: `Task ${task.type} via ${result.agentType}`
-        });
-
-        this.metricsCollector.recordTaskComplete(task, result);
       } else {
         task.status = 'failed';
         task.error = result.error?.message || 'Unknown error';
-
-        // Refund estimated cost on failure (free tier only)
-        if (tier === 'free' && task.estimatedCost > 0) {
-          await this.creditSystem.refund(task.estimatedCost, {
-            ritualId: ritual.id,
-            taskId: task.id,
-            reason: `Task failed: ${task.error}`
-          });
-        }
-
-        this.metricsCollector.recordTaskComplete(task, result);
+        this.metricsCollector.recordTaskComplete(
+          task as unknown as import('./ritual-engine.js').RitualTask,
+          result
+        );
       }
 
       this.options.onTaskComplete(task, result);
-
+      return result;
     } catch (err: any) {
       task.status = 'failed';
       task.error = err.message;
-      task.completedAt = Date.now();
-
-      // Refund on exception too
-      if (tier === 'free' && task.estimatedCost > 0) {
-        await this.creditSystem.refund(task.estimatedCost, {
-          ritualId: ritual.id,
-          taskId: task.id,
-          reason: `Task exception: ${err.message}`
-        });
-      }
+      throw err;
     }
   }
 
-  private isReady(task: RitualTask, allTasks: RitualTask[]): boolean {
-    if (task.status !== 'pending') return false;
-    if (!task.dependsOn || task.dependsOn.length === 0) return true;
+  // ========================================================================
+  // Conditional Branching
+  // ========================================================================
 
-    return task.dependsOn.every(depId => {
-      const dep = allTasks.find(t => t.id === depId);
-      return dep?.status === 'completed';
+  private async determineNextStep(
+    currentStep: RitualTaskV2,
+    result: StepResult,
+    ritual: RitualV2
+  ): Promise<string> {
+    // Check if there's a condition for this step
+    const condition = ritual.conditions.find((c) => c.from === currentStep.type);
+
+    if (!condition) {
+      // No condition, go to next sequential step
+      return this.getNextSequentialStep(currentStep, ritual);
+    }
+
+    // Evaluate condition
+    const context: ConditionContext = {
+      stepResults: this.stepResults,
+      currentStepId: currentStep.type,
+      userQuery: ritual.goal,
+      accumulatedOutput: this.buildAccumulatedOutput(ritual),
+    };
+
+    const evaluationResult = await this.conditionEngine.evaluate(
+      condition,
+      context
+    );
+
+    ritual.metadata.conditionEvaluations++;
+    ritual.conditionResults.set(condition.id, {
+      outcome: evaluationResult.outcome,
+      timestamp: Date.now(),
     });
+
+    // Notify listeners
+    const trace = this.conditionEngine.getTraces().pop();
+    if (trace) {
+      this.options.onConditionEvaluated(trace, ritual);
+    }
+
+    return evaluationResult.outcome === 'then' ? condition.then : condition.else;
   }
 
+  private getNextSequentialStep(
+    currentStep: RitualTaskV2,
+    ritual: RitualV2
+  ): string {
+    const currentIndex = ritual.tasks.findIndex((t) => t.id === currentStep.id);
+    if (currentIndex < 0 || currentIndex >= ritual.tasks.length - 1) {
+      return 'complete';
+    }
+    return ritual.tasks[currentIndex + 1].type;
+  }
+
+  private getFirstStep(ritual: RitualV2): RitualTaskV2 | undefined {
+    // Find the first task that has no dependencies
+    const firstTask = ritual.tasks.find(
+      (t) => !t.dependsOn || t.dependsOn.length === 0
+    );
+    return firstTask || ritual.tasks[0];
+  }
+
+  // ========================================================================
+  // Utilities
+  // ========================================================================
+
   private getDependencyOutputs(
-    task: RitualTask,
-    allTasks: RitualTask[]
+    task: RitualTaskV2,
+    allTasks: RitualTaskV2[]
   ): Record<string, unknown> {
     if (!task.dependsOn) return {};
 
     const outputs: Record<string, unknown> = {};
     for (const depId of task.dependsOn) {
-      const dep = allTasks.find(t => t.id === depId);
+      const dep = allTasks.find((t) => t.id === depId);
       if (dep?.output) {
         outputs[dep.type] = dep.output;
       }
@@ -437,137 +520,129 @@ export class RitualEngineV2 {
     return outputs;
   }
 
-  // =======================================================================
-  // Checkpointing
-  // =======================================================================
+  private buildAccumulatedOutput(ritual: RitualV2): string {
+    const outputs: string[] = [];
+    for (const stepId of ritual.executionPath) {
+      const stepResult = this.stepResults.get(stepId);
+      if (stepResult?.output) {
+        const outputStr =
+          typeof stepResult.output === 'string'
+            ? stepResult.output
+            : JSON.stringify(stepResult.output);
+        outputs.push(`Step ${stepId}:\n${outputStr.slice(0, 500)}`);
+      }
+    }
+    return outputs.join('\n\n---\n\n');
+  }
 
-  private async saveCheckpoint(ritual: Ritual): Promise<void> {
+  private buildFinalOutput(ritual: RitualV2): unknown {
+    // Find the last completed step's output
+    for (let i = ritual.executionPath.length - 1; i >= 0; i--) {
+      const stepId = ritual.executionPath[i];
+      const stepResult = this.stepResults.get(stepId);
+      if (stepResult?.success) {
+        return stepResult.output;
+      }
+    }
+    return undefined;
+  }
+
+  private createTask(plan: RitualPlanV2['tasks'][0]): RitualTaskV2 {
+    const complexityLevels: Record<string, TaskComplexity> = {
+      trivial: { level: 'trivial', estimatedTokens: 1000, requiredTools: [] },
+      simple: { level: 'simple', estimatedTokens: 4000, requiredTools: [] },
+      moderate: { level: 'moderate', estimatedTokens: 8000, requiredTools: [] },
+      complex: { level: 'complex', estimatedTokens: 16000, requiredTools: [] },
+      deep: { level: 'deep', estimatedTokens: 32000, requiredTools: [] },
+    };
+
+    return {
+      id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      type: plan.type,
+      description: plan.description,
+      complexity: complexityLevels[plan.complexity] || complexityLevels.moderate,
+      status: 'pending',
+      dependsOn: plan.dependsOn,
+      input: {},
+      mutations: [],
+      iterationCount: 0,
+    };
+  }
+
+  private async saveCheckpoint(ritual: RitualV2): Promise<void> {
     const completedTasks = ritual.tasks
-      .filter(t => t.status === 'completed')
-      .map(t => t.id);
+      .filter((t) => t.status === 'completed')
+      .map((t) => t.id);
 
     const pendingTasks = ritual.tasks
-      .filter(t => t.status === 'pending')
-      .map(t => t.id);
+      .filter((t) => t.status === 'pending')
+      .map((t) => t.id);
 
     const checkpoint: Checkpoint = {
       ritualId: ritual.id,
       checkpointId: `chk-${Date.now()}`,
       createdAt: Date.now(),
-      state: ritual.context.getState(),
+      state: {
+        ...ritual.context.getState(),
+        executionPath: ritual.executionPath,
+        conditionResults: Object.fromEntries(ritual.conditionResults),
+      },
       mutations: ritual.context.getMutations(),
       completedTasks,
       pendingTasks,
-      version: '2.1.0'
+      version: '2.1.0', // Condition support
     };
 
     await this.checkpointManager.save(checkpoint);
     this.options.onCheckpoint(checkpoint);
   }
 
-  // =======================================================================
-  // Event Handlers
-  // =======================================================================
-
-  private handleProvisionDecision(decision: ProvisionDecision): void {
-    if (!decision.canProceed) {
-      console.log(`🚫 Task ${decision.taskId}: ${decision.reason}`);
-    }
-  }
-
-  private handleSpawnEvent(event: SpawnEvent): void {
-    console.log(`🚀 Spawned ${event.agentType} for task ${event.taskId}`);
-  }
-
-  private handleCompleteEvent(event: CompleteEvent): void {
-    const emoji = event.success ? '✅' : '❌';
-    console.log(`${emoji} Task ${event.taskId} ${event.success ? 'completed' : 'failed'} ($${event.actualCost.toFixed(4)})`);
-  }
-
-  // =======================================================================
-  // Task Factory
-  // =======================================================================
-
-  private createTask(
-    plan: RitualPlan['tasks'][0]
-  ): RitualTask {
-    const complexityLevels: Record<string, TaskComplexity> = {
-      trivial: { level: 'trivial', estimatedTokens: 1000, requiredTools: [] },
-      simple: { level: 'simple', estimatedTokens: 4000, requiredTools: [] },
-      moderate: { level: 'moderate', estimatedTokens: 8000, requiredTools: [] },
-      complex: { level: 'complex', estimatedTokens: 16000, requiredTools: [] },
-      deep: { level: 'deep', estimatedTokens: 32000, requiredTools: [] }
+  private calculateCost(result: SubAgentResult): number {
+    const rates: Record<string, number> = {
+      claude: 0.008,
+      codex: 0.003,
+      kimi: 0.005,
+      opencode: 0.001,
     };
 
-    const complexity = complexityLevels[plan.complexity] || complexityLevels.moderate;
+    const rate = rates[result.agentType] || 0.005;
+    return (result.metrics.tokensUsed / 1000) * rate;
+  }
 
-    // Estimate cost based on default routing
-    const estimatedCost = this.creditSystem.calculateEstimatedCost(
-      this.getDefaultAgentForComplexity(complexity.level),
-      plan.estimatedTokens || complexity.estimatedTokens
-    );
-
-    return {
-      id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-      type: plan.type,
-      description: plan.description,
-      complexity,
-      status: 'pending',
-      dependsOn: plan.dependsOn,
-      input: {},
-      mutations: [],
-      estimatedCost,
-      actualCost: 0
+  private calculateEstimatedCost(
+    agentType: IDEType,
+    estimatedTokens: number
+  ): number {
+    const rates: Record<string, number> = {
+      claude: 0.008,
+      codex: 0.003,
+      kimi: 0.005,
+      opencode: 0.001,
     };
+    const rate = rates[agentType] || 0.005;
+    return (estimatedTokens / 1000) * rate;
   }
 
-  private getDefaultAgentForComplexity(level: string): IDEType {
-    switch (level) {
-      case 'trivial':
-      case 'simple':
-        return 'codex';
-      case 'moderate':
-        return 'kimi';
-      case 'complex':
-      case 'deep':
-        return 'claude';
-      default:
-        return 'codex';
-    }
+  // ========================================================================
+  // Public API
+  // ========================================================================
+
+  getRitual(ritualId: string): RitualV2 | undefined {
+    return this.rituals.get(ritualId);
   }
 
-  // =======================================================================
-  // Stats
-  // =======================================================================
+  listRituals(): RitualV2[] {
+    return Array.from(this.rituals.values());
+  }
 
-  getRitualStats(ritualId: string): {
-    totalTasks: number;
-    completed: number;
-    failed: number;
-    pending: number;
-    progress: number;
-    estimatedCost: number;
-    actualCost: number;
-    savings: number;
-  } | null {
+  getTraces(): ConditionTrace[] {
+    return this.conditionEngine.getTraces();
+  }
+
+  getMermaidDiagram(ritualId: string): string | null {
     const ritual = this.rituals.get(ritualId);
     if (!ritual) return null;
-
-    const total = ritual.tasks.length;
-    const completed = ritual.tasks.filter(t => t.status === 'completed').length;
-    const failed = ritual.tasks.filter(t => t.status === 'failed').length;
-    const pending = ritual.tasks.filter(t => t.status === 'pending').length;
-
-    return {
-      totalTasks: total,
-      completed,
-      failed,
-      pending,
-      progress: total > 0 ? completed / total : 0,
-      estimatedCost: ritual.metadata.estimatedCost,
-      actualCost: ritual.metadata.actualCost,
-      savings: ritual.metadata.estimatedCost - ritual.metadata.actualCost
-    };
+    return this.conditionEngine.exportMermaidDiagram(ritual.conditions);
   }
 }
 
@@ -575,17 +650,6 @@ export class RitualEngineV2 {
 // Factory Function
 // ============================================================================
 
-export async function createRitualEngineV2(
-  userId: string,
-  options?: RitualOptions
-): Promise<RitualEngineV2> {
-  const creditSystem = await (await import('../billing/index.js')).getCreditSystem(userId);
-  const factory = await (await import('../factory/index.js')).createAgentFactory(
-    creditSystem.getTier(),
-    {
-      creditBalance: creditSystem.getBalance()
-    }
-  );
-
-  return new RitualEngineV2(factory, creditSystem, options);
+export function createRitualEngineV2(options?: RitualOptionsV2): RitualEngineV2 {
+  return new RitualEngineV2(options);
 }

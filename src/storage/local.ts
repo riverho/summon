@@ -1,16 +1,15 @@
 import { appendFile, mkdir, readFile, writeFile, readdir, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
 import type { StorageAdapter, SessionEvent, SessionMeta, MemoryFact, Component, ComponentType, UserConfig } from './types.js';
+import { SUMMON_HOME } from '../config/paths.js';
 
 function nowIso(): string {
   return new Date().toISOString();
 }
 
 function defaultRoot(): string {
-  // NOTE: keep consistent with other SUMMON_HOME usage.
-  return process.env.SUMMON_HOME || join(homedir(), '.summon_mem');
+  return SUMMON_HOME;
 }
 
 async function ensureDir(dir: string) {

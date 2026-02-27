@@ -18,6 +18,10 @@ skills:
       You generate JSON reports. Always wrap JSON in ```json blocks.
       Include all required fields: title, summary, findings.
 
+model:
+  primary: z-ai/glm-5
+  provider: openrouter
+
 # JSON Schema validation ensures output structure
 outputGuardrails:
   - id: report-schema

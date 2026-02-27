@@ -1,182 +1,178 @@
 /**
- * Financial Search Tool for Braddy
+ * Financial Search Tool for Summon
  * 
- * This module provides the financial_search tool by importing
- * and adapting the core logic from agent_brad.
+ * Real AlphaVantage API integration for stock data
  */
 
 import { DynamicStructuredTool } from '@langchain/core/tools';
-import { AIMessage, ToolCall } from '@langchain/core/messages';
 import { z } from 'zod';
 import { StructuredToolInterface } from '@langchain/core/tools';
 
-// Import from agent_brad - these need to be available
-// For now, we'll create stub implementations that demonstrate the pattern
-// In production, you'd copy the full tool implementations
-
 // ============================================================================
-// Tool Interfaces (from agent_brad patterns)
+// AlphaVantage API Integration
 // ============================================================================
 
-export interface FinanceToolResult {
-  data: Record<string, unknown>;
-  sourceUrls: string[];
-  error?: string;
-}
+const ALPHAVANTAGE_BASE_URL = 'https://www.alphavantage.co/query';
 
-// ============================================================================
-// Placeholder Finance Tools (to be replaced with real agent_brad imports)
-// ============================================================================
-
-// Stub implementations - these would be replaced with actual tool imports
-const createFinanceTools = (): StructuredToolInterface[] => {
-  return [];
-};
-
-// ============================================================================
-// Financial Search Router Prompt
-// ============================================================================
-
-function getCurrentDate(): string {
-  const options: Intl.DateTimeFormatOptions = {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
+interface AlphaVantageQuote {
+  'Global Quote'?: {
+    '01. symbol': string;
+    '02. open': string;
+    '03. high': string;
+    '04. low': string;
+    '05. price': string;
+    '06. volume': string;
+    '07. latest trading day': string;
+    '08. previous close': string;
+    '09. change': string;
+    '10. change percent': string;
   };
-  return new Date().toLocaleDateString('en-US', options);
+  'Note'?: string;
+  'Information'?: string;
 }
 
-function buildRouterPrompt(): string {
-  return `You are a financial data routing assistant.
-Current date: ${getCurrentDate()}
-
-Given a user's natural language query about financial data, call the appropriate financial tool(s).
-
-## Guidelines
-
-1. **Ticker Resolution**: Convert company names to ticker symbols:
-   - Apple → AAPL, Tesla → TSLA, Microsoft → MSFT, Amazon → AMZN
-   - Google/Alphabet → GOOGL, Meta/Facebook → META, Nvidia → NVDA
-
-2. **Tool Selection**:
-   - For "current" or "latest" data, use snapshot tools
-   - For historical data, use date-range tools
-   - For P/E ratio, market cap → metrics tools
-   - For revenue, earnings → income statements
-   - For debt, assets, equity → balance sheets
-   - For cash flow → cash flow statements
-
-3. **Efficiency**:
-   - Prefer specific tools over general ones
-   - Use comprehensive tools only when needed
-
-Call the appropriate tool(s) now.`;
+async function fetchAlphaVantageQuote(ticker: string, apiKey: string): Promise<AlphaVantageQuote> {
+  const url = `${ALPHAVANTAGE_BASE_URL}?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${apiKey}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`AlphaVantage API error: ${response.status} ${response.statusText}`);
+  }
+  return response.json();
 }
 
-function formatToolResult(data: Record<string, unknown>, sourceUrls: string[]): string {
-  return JSON.stringify({ data, sourceUrls }, null, 2);
+function extractTicker(query: string): string | null {
+  // Common company name to ticker mappings
+  const nameMap: Record<string, string> = {
+    'apple': 'AAPL',
+    'tesla': 'TSLA',
+    'microsoft': 'MSFT',
+    'amazon': 'AMZN',
+    'google': 'GOOGL',
+    'alphabet': 'GOOGL',
+    'meta': 'META',
+    'facebook': 'META',
+    'nvidia': 'NVDA',
+    'netflix': 'NFLX',
+    'amd': 'AMD',
+    'intel': 'INTC',
+  };
+  
+  const lowerQuery = query.toLowerCase();
+  
+  // Check for company names
+  for (const [name, ticker] of Object.entries(nameMap)) {
+    if (lowerQuery.includes(name)) {
+      return ticker;
+    }
+  }
+  
+  // Check for ticker symbols (2-5 uppercase letters)
+  const tickerMatch = query.match(/\b([A-Z]{2,5})\b/);
+  if (tickerMatch) {
+    return tickerMatch[1];
+  }
+  
+  return null;
 }
 
 // ============================================================================
 // Create Financial Search Tool
 // ============================================================================
 
-export function createFinancialSearchTool(model: string = 'gpt-4o-mini'): DynamicStructuredTool {
-  // Create stub finance tools for routing using DynamicStructuredTool
-  const priceSnapshotTool = new DynamicStructuredTool({
-    name: 'get_price_snapshot',
-    description: 'Get current stock price and 24h change',
-    schema: z.object({
-      ticker: z.string().describe('Stock ticker symbol'),
-    }),
-    func: async ({ ticker }) => {
-      const price = Math.random() * 500 + 50;
-      return JSON.stringify({ ticker, price, change: (Math.random() - 0.5) * 10 });
-    },
-  });
-
-  const metricsSnapshotTool = new DynamicStructuredTool({
-    name: 'get_financial_metrics_snapshot',
-    description: 'Get P/E ratio, market cap, EPS, dividend yield',
-    schema: z.object({
-      ticker: z.string().describe('Stock ticker symbol'),
-    }),
-    func: async ({ ticker }) => {
-      return JSON.stringify({
-        ticker,
-        peRatio: 25 + Math.random() * 30,
-        marketCap: Math.random() * 3e12,
-        eps: 3 + Math.random() * 5,
-        dividendYield: (Math.random() * 3).toFixed(2),
-      });
-    },
-  });
-
-  const stubTools: StructuredToolInterface[] = [priceSnapshotTool, metricsSnapshotTool];
-
-  const toolMap = new Map(stubTools.map(t => [t.name, t]));
+export function createFinancialSearchTool(_model: string = 'gpt-4o-mini'): DynamicStructuredTool {
+  const apiKey = process.env.ALPHAVANTAGE_API_KEY;
+  const hasApiKey = !!apiKey;
 
   return new DynamicStructuredTool({
     name: 'financial_search',
-    description: `Intelligent search for financial data. Use for:
-- Stock prices (current or historical)
-- Company financials (income statements, balance sheets, cash flow)
-- Financial metrics (P/E ratio, market cap, EPS, dividend yield)
-- SEC filings (10-K, 10-Q, 8-K)
-- Analyst estimates and price targets
-- Company news
-- Insider trading activity
-- Cryptocurrency prices`,
+    description: `Search for real-time stock prices and financial data using AlphaVantage.
+
+Use this tool for:
+- Current stock prices (e.g., "What's AAPL price?")
+- Stock quotes with open/high/low/close/volume
+- Daily trading data
+
+${hasApiKey ? '✓ AlphaVantage configured' : '✗ AlphaVantage not configured (set ALPHAVANTAGE_API_KEY)'}
+
+Examples:
+- "What is Tesla stock price?" → returns current TSLA quote
+- "AAPL current price" → returns Apple stock data`,
     schema: z.object({
-      query: z.string().describe('Natural language query about financial data'),
+      query: z.string().describe('Natural language query about stock price or financial data'),
     }),
     func: async ({ query }) => {
-      try {
-        // Stub: Simulate tool calling (in real impl, uses LLM routing)
-        const response = new AIMessage({
-          content: '',
-          tool_calls: [
-            {
-              name: 'get_price_snapshot',
-              args: { ticker: 'AAPL' },
-              id: 'call_1',
-              type: 'tool_call',
-            },
-          ],
+      console.log(`[DEBUG] Financial search query: "${query}"`);
+      
+      if (!hasApiKey) {
+        return JSON.stringify({
+          error: 'AlphaVantage API key not configured',
+          message: 'Set ALPHAVANTAGE_API_KEY environment variable',
+          query,
         });
+      }
 
-        const toolCalls = response.tool_calls as ToolCall[];
-        
-        const results = await Promise.all(
-          toolCalls.map(async (tc) => {
-            try {
-              const tool = toolMap.get(tc.name);
-              if (!tool) {
-                throw new Error(`Tool '${tc.name}' not found`);
-              }
-              const rawResult = await tool.invoke(tc.args);
-              const result = typeof rawResult === 'string' ? rawResult : JSON.stringify(rawResult);
-              const parsed = JSON.parse(result);
-              return { tool: tc.name, args: tc.args, data: parsed, error: null };
-            } catch (error) {
-              return { tool: tc.name, args: tc.args, data: null, error: String(error) };
-            }
-          })
-        );
+      const ticker = extractTicker(query);
+      console.log(`[DEBUG] Extracted ticker: ${ticker}`);
+      
+      if (!ticker) {
+        return JSON.stringify({
+          error: 'Could not extract ticker symbol from query',
+          query,
+          hint: 'Try using a ticker symbol (e.g., AAPL, TSLA) or company name (e.g., Apple, Tesla)',
+        });
+      }
 
-        const successfulResults = results.filter(r => r.error === null);
-        const combinedData: Record<string, unknown> = {};
+      try {
+        const data = await fetchAlphaVantageQuote(ticker, apiKey!);
         
-        for (const result of successfulResults) {
-          const ticker = (result.args as Record<string, unknown>).ticker as string | undefined;
-          const key = ticker ? `${result.tool}_${ticker}` : result.tool;
-          combinedData[key] = result.data;
+        // Check for API limit/error messages
+        if (data['Note']) {
+          return JSON.stringify({
+            error: 'AlphaVantage API limit reached',
+            message: data['Note'],
+            query,
+            ticker,
+          });
+        }
+        
+        if (data['Information']) {
+          return JSON.stringify({
+            error: 'AlphaVantage API error',
+            message: data['Information'],
+            query,
+            ticker,
+          });
         }
 
-        return formatToolResult(combinedData, []);
+        const quote = data['Global Quote'];
+        if (!quote) {
+          return JSON.stringify({
+            error: 'No data found for ticker',
+            ticker,
+            query,
+          });
+        }
+
+        return JSON.stringify({
+          ticker: quote['01. symbol'],
+          price: parseFloat(quote['05. price']),
+          open: parseFloat(quote['02. open']),
+          high: parseFloat(quote['03. high']),
+          low: parseFloat(quote['04. low']),
+          volume: parseInt(quote['06. volume']),
+          latestTradingDay: quote['07. latest trading day'],
+          previousClose: parseFloat(quote['08. previous close']),
+          change: parseFloat(quote['09. change']),
+          changePercent: quote['10. change percent'],
+          source: 'AlphaVantage',
+        });
       } catch (error) {
-        return formatToolResult({ error: String(error) }, []);
+        return JSON.stringify({
+          error: 'Failed to fetch financial data',
+          message: String(error),
+          query,
+          ticker,
+        });
       }
     },
   });
@@ -212,4 +208,15 @@ Note: In production, this would search the web for current information.`;
 Note: This is a placeholder. Configure Tavily or Exa for real web search.`;
     },
   });
+}
+
+// ============================================================================
+// Tool Exports
+// ============================================================================
+
+export function createFinanceTools(): StructuredToolInterface[] {
+  return [
+    createFinancialSearchTool(),
+    createWebSearchTool(),
+  ];
 }

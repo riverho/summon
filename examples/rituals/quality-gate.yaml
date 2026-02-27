@@ -1,0 +1,52 @@
+# Quality Gate Ritual
+# Ensures content passes quality checks before delivery
+
+name: content-quality-gate
+version: 1.0.0
+description: Multi-stage content creation with quality gates
+
+steps:
+  - id: draft
+    name: Draft Creation
+    agent: writer
+    description: Create initial draft content
+    complexity: moderate
+    
+  - id: grammar-check
+    name: Grammar Review
+    agent: grammar-reviewer
+    description: Check grammar and style issues
+    complexity: simple
+    dependsOn: [draft]
+    
+  - id: edit
+    name: Content Editing
+    agent: editor
+    description: Fix identified issues
+    complexity: moderate
+    dependsOn: [grammar-check]
+    
+  - id: review
+    name: Final Review
+    agent: reviewer
+    description: Final quality assessment
+    complexity: simple
+    dependsOn: [edit]
+
+conditions:
+  - id: grammar-gate
+    from: grammar-check
+    condition: "grammar_errors > 5"
+    then: edit          # Need editing
+    else: review        # Clean enough for review
+    
+  - id: quality-loop
+    from: review
+    condition: "quality_score < 0.7"
+    then: draft         # Start over
+    else: complete      # Good to go
+
+evaluation:
+  model: gpt-4o-mini    # Fast, cheap for routing
+  timeout: 3s
+  max_retries: 1

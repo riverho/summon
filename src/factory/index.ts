@@ -16,3 +16,6 @@ export type {
   CompleteEvent,
   ActiveSession
 } from './agent-factory.js';
+
+// IDEType comes from durable types
+export type { IDEType } from '../durable/types.js';

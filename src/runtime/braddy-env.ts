@@ -2,13 +2,14 @@
 
 import { join, dirname } from 'path';
 import { homedir } from 'os';
+import { SUMMON_HOME } from '../config/paths.js';
 
 export function getInstallDir(): string {
   return dirname(import.meta.url.replace('file://', ''));
 }
 
 export function getSummonHome(): string {
-  return process.env.SUMMON_HOME || join(homedir(), '.summon_mem');
+  return SUMMON_HOME;
 }
 
 export function resolvePath(inputPath: string): string {

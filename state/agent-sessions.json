@@ -1,370 +1,83 @@
 {
   "version": "2.0.0",
-  "schema": {
-    "lastUpdated": "2026-02-10T13:25:00Z",
-    "changelog": [
-      "v2.0.1: Archived orphaned sessions (builder_ABC2, sa_graduation_builder, sa_reviewer)",
-      "v2.0.0: Added dependency DAG, retry logic, capability registry, structured output",
-      "v1.0.0: Basic session tracking"
-    ]
-  },
-  "capabilities": {
-    "codex": {
-      "name": "Codex CLI",
-      "strengths": ["fast-editing", "full-auto-mode", "good-for-drafts"],
-      "weaknesses": ["context-window", "occasional-hallucination"],
-      "bestFor": ["implementation", "refactoring", "quick-fixes"],
-      "flags": "--full-auto",
-      "verifyCommand": "which codex",
-      "structuredOutput": false
-    },
-    "claude": {
-      "name": "Claude Code",
-      "strengths": ["deep-analysis", "review", "careful-planning"],
-      "weaknesses": ["slower", "more-expensive"],
-      "bestFor": ["review", "architecture", "complex-reasoning"],
-      "flags": "-p",
-      "verifyCommand": "which claude",
-      "structuredOutput": false
-    },
-    "opencode": {
-      "name": "OpenCode",
-      "strengths": ["open-source", "customizable"],
-      "weaknesses": ["newer", "less-tested"],
-      "bestFor": ["experimental", "custom-workflows"],
-      "flags": "run",
-      "verifyCommand": "which opencode",
-      "structuredOutput": false
-    },
-    "kimi": {
-      "name": "Kimi CLI",
-      "strengths": ["kimi-k2.5-model", "great-for-coding", "long-context", "chinese-english-bilingual"],
-      "weaknesses": ["requires-api-key", "smaller-ecosystem"],
-      "bestFor": ["implementation", "analysis", "complex-reasoning", "chinese-context"],
-      "flags": "chat",
-      "verifyCommand": "which kimi",
-      "structuredOutput": false
-    }
-  },
-  "config": {
-    "retryPolicy": {
-      "maxRetries": 3,
-      "backoffMs": 5000,
-      "backoffMultiplier": 2,
-      "retryableStatuses": ["failed", "crashed", "timeout"]
-    },
-    "rotationPolicy": {
-      "maxTurns": 10,
-      "compactTrigger": "/compact-ao"
-    },
-    "heartbeat": {
-      "staleThresholdMinutes": 5,
-      "autoCleanup": true,
-      "cleanupAction": "mark-stale"
-    },
-    "worktreePolicy": {
-      "baseDir": "~/.openclaw/ao-sessions",
-      "activeDir": "active",
-      "archiveDir": "archived",
-      "sharedDir": "shared",
-      "templatesDir": "templates",
-      "namingConvention": "{project}-{task}-{agent}-{timestamp}",
-      "retentionDays": 30,
-      "autoArchive": true,
-      "autoCleanupArchived": true,
-      "indexFile": "index.jsonl"
-    }
+  "lastUpdated": "2026-02-23T05:25:00Z",
+  "orchestration": {
+    "id": "gap-chat-k25-20260223",
+    "project": "summon-academy",
+    "plan": "GAP_CHAT_CONTEXT_MANAGER_K25_PLAN.md",
+    "status": "completed",
+    "startedAt": "2026-02-23T05:12:00Z",
+    "completedAt": "2026-02-23T05:25:00Z"
   },
   "sessions": {
-    "builder": {
-      "id": "mild-comet",
+    "codex_wiring": {
+      "id": "cool-gulf",
       "agent": "codex",
+      "pid": 98714,
       "status": "completed",
-      "startedAt": 0,
-      "turns": 1,
-      "lastUpdate": "completed",
-      "nextMilestone": "(done)",
-      "retries": 0,
-      "dependsOn": [],
-      "outputs": {}
+      "phases": ["A", "D"],
+      "tasks": ["persistence_wiring", "settings_model_plan"],
+      "startedAt": "2026-02-23T05:15:00Z",
+      "lastUpdate": "completed: app.tsx wiring + settings-panel model plan UI (+600 lines)",
+      "timeoutMinutes": 30
     },
-    "reviewer": {
-      "id": "good-breeze",
+    "claude_policy": {
+      "id": "quiet-lobster",
       "agent": "claude",
+      "pid": 98271,
       "status": "completed",
-      "startedAt": 0,
-      "turns": 1,
-      "lastUpdate": "completed",
-      "nextMilestone": "(done)",
-      "retries": 0,
-      "dependsOn": ["builder"],
-      "outputs": {}
+      "phases": ["E"],
+      "tasks": ["graduation_policy", "context_manager_interface"],
+      "startedAt": "2026-02-23T05:12:00Z",
+      "lastUpdate": "completed: graduation policy + context-manager-interface.ts (+300 lines)",
+      "timeoutMinutes": 30
     },
-    "builder2": {
-      "id": "crisp-cedar",
-      "agent": "codex",
-      "status": "completed",
-      "startedAt": 0,
-      "turns": 1,
-      "lastUpdate": "completed",
-      "nextMilestone": "(done)",
-      "retries": 0,
-      "dependsOn": [],
-      "outputs": {}
-    },
-    "reviewer2": {
-      "id": "quick-crest",
-      "agent": "claude",
-      "status": "completed",
-      "startedAt": 0,
-      "turns": 1,
-      "lastUpdate": "completed",
-      "nextMilestone": "(done)",
-      "retries": 0,
-      "dependsOn": ["builder2"],
-      "outputs": {}
-    },
-    "m1_builder": {
-      "id": "vivid-kelp",
-      "agent": "codex",
-      "status": "archived",
-      "startedAt": 0,
-      "turns": 1,
-      "lastUpdate": "archived: failed session cleaned up (codex exec usage error)",
-      "nextMilestone": "(archived)",
-      "retries": 1,
-      "dependsOn": [],
-      "outputs": {},
-      "error": "codex exec usage error"
-    },
-    "m1_reviewer": {
-      "id": "sharp-trail",
-      "agent": "claude",
-      "status": "completed",
-      "startedAt": 0,
-      "turns": 1,
-      "lastUpdate": "completed",
-      "nextMilestone": "(done)",
-      "retries": 0,
-      "dependsOn": ["m1_builder"],
-      "outputs": {}
-    },
-    "m3_builder": {
-      "id": "tidal-fjord",
-      "agent": "codex",
-      "status": "completed",
-      "startedAt": 0,
-      "turns": 1,
-      "lastUpdate": "completed: implemented timeouts/cancel/guardrails/pauseAfter (uncommitted changes)",
-      "nextMilestone": "review diff + commit",
-      "retries": 0,
-      "dependsOn": [],
-      "outputs": {
-        "artifacts": ["STATUS.md", "IMPLEMENTATION_PLAN.md"]
-      }
-    },
-    "m3_reviewer": {
-      "id": "faint-atlas",
-      "agent": "claude",
-      "status": "completed",
-      "startedAt": 0,
-      "turns": 1,
-      "lastUpdate": "completed: spec + risk list + deterministic test plan (see logs)",
-      "nextMilestone": "(done)",
-      "retries": 0,
-      "dependsOn": ["m3_builder"],
-      "outputs": {
-        "artifacts": ["REVIEW.md"]
-      }
-    },
-    "builder_A": {
-      "id": "faint-breeze",
-      "agent": "codex",
-      "status": "completed",
-      "startedAt": 1770346471318,
-      "turns": 1,
-      "lastUpdate": "auto-marked completed by heartbeat 2026-02-06T12:30:59.250Z; process not running",
-      "nextMilestone": "stale entry cleared",
-      "retries": 0,
-      "dependsOn": [],
-      "outputs": {}
-    },
-    "reviewer_ABC": {
-      "id": "salty-nexus",
-      "agent": "claude",
-      "status": "completed",
-      "startedAt": 1770346471318,
-      "turns": 1,
-      "lastUpdate": "auto-marked completed by heartbeat 2026-02-06T12:30:59.250Z; process not running",
-      "nextMilestone": "stale entry cleared",
-      "retries": 0,
-      "dependsOn": ["builder_A"],
-      "outputs": {}
-    },
-    "builder_ABC2": {
-      "id": "crisp-sage",
-      "agent": "codex",
-      "status": "archived",
-      "startedAt": 1770347860625,
-      "turns": 1,
-      "lastUpdate": "archived: orphaned session, artifacts preserved in state history",
-      "nextMilestone": "(archived)",
-      "retries": 0,
-      "dependsOn": [],
-      "outputs": {
-        "artifacts": ["STATUS.md", "IMPLEMENTATION_PLAN.md"]
-      }
-    },
-    "aa_crawler": {
-      "id": "mellow-bloom",
-      "agent": "codex",
-      "status": "merged",
-      "startedAt": 1738898500000,
-      "turns": 1,
-      "lastUpdate": "merged to main: crawler module consolidated (0ba1e5c) - moved to ao-sessions",
-      "nextMilestone": "(done)",
-      "retries": 0,
-      "dependsOn": [],
-      "outputs": {
-        "artifacts": ["STATUS.md", "IMPLEMENTATION_PLAN.md", "crawler/"]
-      },
-      "project": "summon-academy",
-      "worktree": "~/.openclaw/ao-sessions/archived/summon-academy-crawler"
-    },
-    "aa_refiner": {
-      "id": "oceanic-mist",
+    "kimi_context": {
+      "id": "young-falcon",
       "agent": "kimi",
-      "status": "merged",
-      "startedAt": 1738898500000,
-      "turns": 1,
-      "lastUpdate": "merged to main: refiner models/metrics consolidated (0ba1e5c) - moved to ao-sessions",
-      "nextMilestone": "(done)",
-      "retries": 2,
-      "dependsOn": [],
-      "outputs": {
-        "artifacts": ["IMPLEMENTATION_PLAN.md", "refiner/models.py", "refiner/metrics.py"]
-      },
-      "project": "summon-academy",
-      "worktree": "~/.openclaw/ao-sessions/archived/summon-academy-refiner"
-    },
-    "aa_reviewer": {
-      "id": "amber-rook",
-      "agent": "claude",
+      "pid": 98545,
       "status": "completed",
-      "startedAt": 1738898620000,
-      "turns": 1,
-      "lastUpdate": "completed: review cycle finished (7m01s)",
-      "nextMilestone": "(done)",
-      "retries": 0,
-      "dependsOn": ["aa_crawler", "aa_refiner"],
-      "outputs": {},
-      "project": "summon-academy"
-    },
-    "sa_refiner_builder": {
-      "id": "quiet-river",
-      "agent": "codex",
-      "status": "merged",
-      "startedAt": 1739106400000,
-      "turns": 1,
-      "lastUpdate": "merged to main: yaml_refiner.py committed (d5fc06d) - moved to ao-sessions",
-      "nextMilestone": "(done)",
-      "retries": 0,
-      "dependsOn": [],
-      "outputs": {
-        "artifacts": ["refiner/yaml_refiner.py", "refiner/__init__.py", "STATUS.md", "IMPLEMENTATION_PLAN.md"]
-      },
-      "project": "summon-academy",
-      "worktree": "~/.openclaw/ao-sessions/archived/sa-refiner-codex"
-    },
-    "sa_graduation_builder": {
-      "id": "swift-trail",
-      "agent": "kimi",
-      "status": "archived",
-      "startedAt": 1739106405000,
-      "turns": 1,
-      "lastUpdate": "archived: moved to ao-sessions/archived/",
-      "nextMilestone": "(archived)",
-      "retries": 0,
-      "dependsOn": [],
-      "outputs": {
-        "artifacts": ["refiner/graduation.py", "refiner/__init__.py", "STATUS.md"]
-      },
-      "project": "summon-academy",
-      "worktree": "~/.openclaw/ao-sessions/archived/sa-graduation-kimi"
-    },
-    "sa_reviewer": {
-      "id": "gentle-meadow",
-      "agent": "claude",
-      "status": "archived",
-      "startedAt": 1739107840000,
-      "turns": 1,
-      "lastUpdate": "archived: moved to ao-sessions/archived/",
-      "nextMilestone": "(archived)",
-      "retries": 3,
-      "dependsOn": ["sa_refiner_builder", "sa_graduation_builder"],
-      "outputs": {
-        "artifacts": ["/tmp/sa-review-claude-v2/REVIEW.md"]
-      },
-      "project": "summon-academy",
-      "worktree": "~/.openclaw/ao-sessions/archived/sa-review-claude-v3"
-    },
-    "sa_langsmith_builder": {
-      "id": "clear-valley",
-      "agent": "kimi",
-      "status": "cancelled",
-      "startedAt": 1739112200000,
-      "turns": 0,
-      "lastUpdate": "cancelled by user - moved to ao-sessions/archived/",
-      "nextMilestone": "(cancelled)",
-      "retries": 0,
-      "dependsOn": [],
-      "outputs": {},
-      "project": "summon-academy",
-      "worktree": "~/.openclaw/ao-sessions/archived/sa-langsmith-kimi"
-    },
-    "sa_pipeline_builder": {
-      "id": "tide-breeze",
-      "agent": "codex",
-      "status": "cancelled",
-      "startedAt": 1739112200000,
-      "turns": 0,
-      "lastUpdate": "cancelled by user - moved to ao-sessions/archived/",
-      "nextMilestone": "(cancelled)",
-      "retries": 0,
-      "dependsOn": [],
-      "outputs": {},
-      "project": "summon-academy",
-      "worktree": "~/.openclaw/ao-sessions/archived/sa-pipeline-codex"
-    },
-    "sa_phase3_reviewer": {
-      "id": null,
-      "agent": "claude",
-      "status": "archived",
-      "startedAt": 0,
-      "turns": 0,
-      "lastUpdate": "archived: moved to ao-sessions/archived/",
-      "nextMilestone": "(archived)",
-      "retries": 0,
-      "dependsOn": [],
-      "outputs": {},
-      "project": "summon-academy",
-      "worktree": "~/.openclaw/ao-sessions/archived/sa-review-phase3"
-    },
-    "multiagent_builder": {
-      "id": "tender-claw",
-      "agent": "codex",
-      "status": "merged",
-      "startedAt": 1739147760000,
-      "turns": 1,
-      "lastUpdate": "merged to main: all changes committed (6e868ee)",
-      "nextMilestone": "(done)",
-      "retries": 0,
-      "dependsOn": [],
-      "outputs": {
-        "artifacts": ["STATUS.md", "IMPLEMENTATION_PLAN.md", "src/cli/index.ts"]
-      },
-      "project": "summon",
-      "worktree": "/Users/river/.openclaw/workspace/projects/summon"
+      "phases": ["B", "C"],
+      "tasks": ["context_manager_v1", "proposal_decisions"],
+      "startedAt": "2026-02-23T05:14:00Z",
+      "lastUpdate": "completed: context-manager.ts + gap-chat slash commands (+700 lines)",
+      "timeoutMinutes": 40
     }
-  }
+  },
+  "dependencies": {
+    "kimi_context": ["claude_policy"]
+  },
+  "artifacts": {
+    "created": [
+      "src/training/context-manager-interface.ts",
+      "src/training/context-manager.ts"
+    ],
+    "modified": [
+      "src/tui/app.tsx",
+      "src/tui/settings-panel.tsx",
+      "src/training/autonomous.ts",
+      "src/training/state.ts",
+      "src/training/gap-chat.ts",
+      "src/training/engine.ts",
+      "src/training/index.ts",
+      "src/llm/client.ts"
+    ],
+    "documentation": [
+      "STATUS.md",
+      "REVIEW_SYNTHESIS.md"
+    ]
+  },
+  "summary": {
+    "totalFilesChanged": 20,
+    "linesAdded": 1807,
+    "linesRemoved": 466,
+    "reviewStatus": "completed_by_brad",
+    "synthesisStatus": "completed"
+  },
+  "nextSteps": [
+    "Run npm run typecheck to verify types",
+    "Run npm run build to verify build",
+    "Test gap chat persistence",
+    "Wire /apply command to trigger retrain"
+  ]
 }

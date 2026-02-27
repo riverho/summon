@@ -13,6 +13,10 @@ persona:
 skills:
   - $ref: finance
 
+model:
+  primary: z-ai/glm-5
+  provider: openrouter
+
 # Guardrails to ensure quality output
 outputGuardrails:
   # Ensure output has a summary section

@@ -18,6 +18,10 @@ skills:
       You generate API responses. Always include status field.
       For errors, include message and optional code fields.
 
+model:
+  primary: z-ai/glm-5
+  provider: openrouter
+
 # API response validation
 outputGuardrails:
   # Must be valid JSON

@@ -1,0 +1,53 @@
+# Adaptive Researcher Ritual with Conditions
+# Demonstrates quality-based looping and adaptive execution
+
+name: adaptive-researcher
+version: 1.0.0
+description: Research agent that adapts based on result quality
+
+steps:
+  - id: research
+    name: Research Phase
+    agent: researcher
+    description: Gather information from multiple sources
+    complexity: moderate
+    
+  - id: analyze
+    name: Analysis Phase
+    agent: analyzer
+    description: Analyze gathered information for quality
+    complexity: moderate
+    dependsOn: [research]
+    
+  - id: write
+    name: Writing Phase
+    agent: writer
+    description: Create final report
+    complexity: moderate
+    dependsOn: [analyze]
+
+# Conditional edges for adaptive behavior
+conditions:
+  - id: quality-check
+    from: analyze
+    condition: "confidence < 0.8"
+    then: research    # Loop back if quality is low
+    else: write       # Continue if quality is good
+    
+  - id: completeness-check
+    from: research
+    condition: "sources.length < 3"
+    then: research    # Stay and gather more sources
+    else: analyze     # Move to analysis
+    
+  - id: final-review
+    from: write
+    condition: "word_count < 500"
+    then: write       # Expand the content
+    else: complete    # Done
+
+# Global evaluation settings
+evaluation:
+  model: default      # Use ritual's model
+  timeout: 5s         # Don't block too long
+  max_retries: 2      # Retry if evaluation fails

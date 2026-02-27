@@ -18,6 +18,10 @@ skills:
       You write clean, well-documented TypeScript code.
       Always use proper error handling and follow best practices.
 
+model:
+  primary: z-ai/glm-5
+  provider: openrouter
+
 # Output guardrails ensure code quality BEFORE it's returned
 outputGuardrails:
   # Block TODO/FIXME markers

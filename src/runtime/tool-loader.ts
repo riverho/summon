@@ -1,11 +1,9 @@
 import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
 import { pathToFileURL } from 'url';
 import { globalToolRegistry, RegisteredTool } from './tools.js';
+import { PATHS } from '../config/paths.js';
 
-// SUMMON_HOME: Installation directory (for portable use from any folder)
-const SUMMON_HOME = process.env.SUMMON_HOME || join(homedir(), '.summon_mem');
 const COMPONENTS_DIR = 'components';
 const TOOLS_DIR = 'tools';
 
@@ -25,7 +23,7 @@ export interface ExternalToolDefinition {
  * Get the tools directory path
  */
 function getToolsDir(): string {
-  return join(SUMMON_HOME, COMPONENTS_DIR, TOOLS_DIR);
+  return PATHS.tools;
 }
 
 /**
@@ -82,7 +80,7 @@ async function loadToolFile(filepath: string): Promise<RegisteredTool | null> {
 export async function loadExternalTools(): Promise<RegisteredTool[]> {
   const loadedTools: RegisteredTool[] = [];
   
-  // Load from user global ~/.summon_mem/components/tools/
+  // Load from user global ~/.summon/components/tools/
   const userToolsDir = getToolsDir();
   for (const file of findToolFiles(userToolsDir)) {
     const tool = await loadToolFile(file);
@@ -91,8 +89,8 @@ export async function loadExternalTools(): Promise<RegisteredTool[]> {
     }
   }
   
-  // Load from local .summon_mem/components/tools/
-  const localToolsDir = join(process.cwd(), '.summon_mem', COMPONENTS_DIR, TOOLS_DIR);
+  // Load from local .summon/components/tools/ (if exists)
+  const localToolsDir = join(process.cwd(), '.summon', COMPONENTS_DIR, TOOLS_DIR);
   for (const file of findToolFiles(localToolsDir)) {
     const tool = await loadToolFile(file);
     if (tool) {
@@ -136,7 +134,7 @@ export function listExternalToolFiles(): string[] {
     files.push(...findToolFiles(userToolsDir).map(f => `user:${f}`));
   }
   
-  const localToolsDir = join(process.cwd(), '.summon_mem', COMPONENTS_DIR, TOOLS_DIR);
+  const localToolsDir = join(process.cwd(), '.summon', COMPONENTS_DIR, TOOLS_DIR);
   if (existsSync(localToolsDir)) {
     files.push(...findToolFiles(localToolsDir).map(f => `local:${f}`));
   }

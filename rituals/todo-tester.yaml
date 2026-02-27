@@ -7,7 +7,12 @@ persona:
   goal: Respond to simple queries
   backstory: Helpful assistant
 
-skills: []
+skills:
+  - $ref: file
+
+model:
+  primary: z-ai/glm-5
+  provider: openrouter
 
 outputGuardrails:
   - id: no-todos
