@@ -12,6 +12,7 @@ import { join } from 'path';
 import { runSetup } from './setup.js';
 import { interactiveSetup, checkRitalRequirements } from './setup-helper.js';
 import { executeRitualByRef, executeRitualFromYaml, streamExecuteRitual } from '../runtime/index.js';
+import { createMCPCommands } from './mcp-commands.js';
 
 // Load .env if present
 config({ quiet: true });
@@ -353,6 +354,9 @@ sessionsCmd
     console.log('  (No sessions yet)');
     // TODO: Implement session listing
   });
+
+// MCP commands
+program.addCommand(createMCPCommands());
 
 // Parse and run
 program.parse();

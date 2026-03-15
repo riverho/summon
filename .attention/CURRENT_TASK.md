@@ -64,9 +64,15 @@
 - [x] TypeScript errors resolved
 - [x] `bun test` passes (24 pass, 0 fail)
 - [x] `npm run typecheck` passes
+- [x] MCP commands wired up in CLI
 
 **Blockers:** None
 
 **Fixes applied:**
 1. Fixed test assertion in engine.test.ts
 2. Removed bundled index.ts from git + tsconfig exclude
+3. Wired up MCP commands in summon.ts
+4. Verified MCP works: `summon mcp list` → context7 connected
+
+**Attention-repo:**
+- Freshness check: PASSED
