@@ -31,12 +31,12 @@ describe('ConditionEngine', () => {
 
     it('should detect expression conditions', () => {
       const expressions = [
-        '${output.confidence} < 0.8',
-        'word_count > 500',
+        { expr: '${output.confidence} < 0.8', hasOp: '<' },
+        { expr: 'word_count > 500', hasOp: '>' },
       ];
 
-      for (const expr of expressions) {
-        expect(expr).toContain('<');
+      for (const { expr, hasOp } of expressions) {
+        expect(expr).toContain(hasOp);
       }
     });
   });

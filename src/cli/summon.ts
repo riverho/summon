@@ -11,6 +11,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { runSetup } from './setup.js';
 import { interactiveSetup, checkRitalRequirements } from './setup-helper.js';
+import { executeRitualByRef, executeRitualFromYaml, streamExecuteRitual } from '../runtime/index.js';
 
 // Load .env if present
 config({ quiet: true });
@@ -128,7 +129,10 @@ program
 program
   .argument('[query]', 'Your question or task')
   .option('-r, --ritual <path>', 'Ritual YAML file')
+  .option('-R, --reference <ref>', 'Ritual reference (e.g., @author/name)')
   .option('-q, --quick', 'Quick compose mode (no ritual file)')
+  .option('-i, --interactive', 'Interactive mode with checkpoints')
+  .option('-a, --autonomous', 'Fully autonomous mode (no checkpoints)')
   .option('--dry-run', 'Show what would be done')
   .action(async (query: string | undefined, options: any) => {
     // Check if first run
@@ -195,8 +199,65 @@ program
     // Delegate to main CLI
     console.log(`\n🦞 Summoning: "${query}"`);
     console.log('Mode:', status.mode);
-    console.log('This would run the full summon pipeline.');
-    // TODO: Import and call actual run command from index.ts
+    
+    try {
+      let result;
+      
+      if (options.ritual) {
+        // Load and execute from local YAML file
+        const ritualPath = options.ritual;
+        console.log(`Loading ritual: ${ritualPath}`);
+        
+        // Read the YAML file
+        const yamlContent = readFileSync(ritualPath, 'utf-8');
+        
+        result = await executeRitualFromYaml(yamlContent, query, {
+          mode: options.interactive ? 'interactive' : (options.autonomous ? 'autonomous' : 'autonomous'),
+          streaming: true
+        });
+      } else if (options.reference) {
+        // Execute from registry reference (e.g., @author/name)
+        const ref = options.reference;
+        console.log(`Fetching ritual: ${ref}`);
+        
+        result = await executeRitualByRef(ref, query, {
+          mode: options.interactive ? 'interactive' : (options.autonomous ? 'autonomous' : 'autonomous'),
+          streaming: true
+        });
+      } else {
+        // Quick compose mode - just use default settings
+        console.log('Using quick-compose mode');
+        // For quick compose, we need a basic YAML - use a minimal default
+        const defaultYaml = `
+name: quick-summon
+version: 1.0.0
+persona:
+  role: Assistant
+  goal: Help the user
+model:
+  provider: openrouter
+  name: google/gemini-2.0-flash
+`;
+        result = await executeRitualFromYaml(defaultYaml, query, {
+          mode: options.interactive ? 'interactive' : (options.autonomous ? 'autonomous' : 'autonomous'),
+          streaming: true
+        });
+      }
+      
+      // Handle streaming or regular result
+      if (result && typeof result[Symbol.asyncIterator] === 'function') {
+        // Streaming result
+        for await (const chunk of result) {
+          process.stdout.write(chunk);
+        }
+      } else if (result) {
+        // Regular result
+        console.log('\n✅ Result:', result);
+      }
+    } catch (error: any) {
+      console.error('\n❌ Summoning failed:', error.message);
+      process.exit(1);
+    }
   });
 
 // Config command group

@@ -23,6 +23,9 @@ import {
   clearCheckpoint,
   isPausedAtCheckpoint,
 } from './context.js';
+
+// Re-export types for consumers
+export type { ExecutionContext, ExecutionResult, ExecutionStatus, ExecutionTrace, ExecutionState } from './context.js';
 import {
   type SteeringPreferences,
   type ExecutionMode,

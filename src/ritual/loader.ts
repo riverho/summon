@@ -115,6 +115,9 @@ export function loadRitualFromYaml(yaml: string): Ritual {
   return parsed;
 }
 
+// Alias for convenience
+export const loadRitual = loadRitualFromYaml;
+
 /**
  * Get the list of required skills from a ritual
  * @param ritual - The ritual to extract skills from

@@ -1,0 +1,52 @@
+# stock-analyzer.yaml — Minimal ritual with tool calling
+name: stock-analyzer
+version: 1.0.0
+owner: river
+description: Basic stock analysis with Yahoo Finance
+
+persona:
+  role: Financial Analyst
+  goal: Provide stock price and basic metrics
+  backstory: Simple analyst that fetches market data
+
+# Tool declaration — maps to external tool
+manifest:
+  external_tools:
+    - name: yfinance
+      via: mcp
+      server: yfinance-mcp
+      description: Yahoo Finance market data
+      actions:
+        - get_ticker
+        - get_history
+      requires_env: ["YFINANCE_API_KEY"]
+      # Actually for now, let's use the existing financial_search
+      # which already works via AlphaVantage
+    - name: financial_search
+      via: mcp  
+      server: alphavantage-mcp
+      description: Stock data from AlphaVantage
+      requires_env: ["ALPHAVANTAGE_API_KEY"]
+
+model:
+  primary: gpt-4o-mini
+  provider: openai
+
+guardrails:
+  maxResponseLength: 1000
+  
+# Simple execution flow
+execution:
+  steps:
+    - name: fetch_data
+      tool: financial_search
+      action: quote
+      params:
+        symbol: "{{input.symbol}}"
+      
+    - name: analyze
+      prompt: |
+        Given this stock data:
+        {{steps.fetch_data.result}}
+        
+        Provide a brief analysis (2-3 sentences) of the stock performance.

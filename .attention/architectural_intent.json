@@ -1,0 +1,12 @@
+{
+  "declared_at": "2026-03-11T14:04:42.321131+00:00",
+  "task_type": "code",
+  "affected_entities": [
+    "E-SUMMON-CLI-01",
+    "E-SUMMON-ORCH-01",
+    "E-SUMMON-RUNTIME-01"
+  ],
+  "deployment_pipeline": ".github/workflows/ci.yml",
+  "first_principle_summary": "Document current summon implementation status for attention layer tracking and future reference",
+  "requires_new_entity": false
+}

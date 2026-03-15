@@ -1,0 +1,248 @@
+# CF-Hosted Tool Catalog v1.0
+# Registry of Cloudflare-hosted tools fetched from R2 on demand
+
+version: "1.0.0"
+updated_at: "2026-02-27"
+registry_url: "https://r2.summon-ai.com/tools"
+api_endpoint: "https://tools.summon-ai.com"
+
+# ─────────────────────────────────────────────
+# Layer 2: CF-Hosted Tools
+# ─────────────────────────────────────────────
+tools:
+  # Yahoo Finance
+  yfinance:
+    name: yfinance
+    layer: cf_hosted
+    owner: summon
+    
+    versions:
+      - version: "2.0.0"
+        status: stable
+        release_date: "2026-02-27"
+        
+      - version: "1.5.0"
+        status: deprecated
+        sunset_date: "2026-06-01"
+    
+    current_version: "2.0.0"
+    
+    description: Yahoo Finance market data
+    long_description: |
+      Real-time and historical stock market data from Yahoo Finance.
+      Includes quotes, charts, company search, and fundamental data.
+    
+    category: finance
+    tags: [stocks, market-data, prices, yahoo]
+    
+    endpoint: "https://tools.summon-ai.com/yfinance"
+    manifest_url: "https://r2.summon-ai.com/tools/summon/yfinance/{version}/tool.yaml"
+    
+    actions:
+      - name: get_quote
+        description: Get current stock quote
+        parameters: [symbol]
+        
+      - name: get_history
+        description: Get historical price data
+        parameters: [symbol, period, interval]
+        
+      - name: search
+        description: Search for stocks
+        parameters: [query]
+    
+    sandbox:
+      network:
+        allowlist:
+          - query1.finance.yahoo.com
+          - query2.finance.yahoo.com
+          - fc.yahoo.com
+      
+      runtime:
+        max_execution_time: 30000  # 30s
+        max_memory: 128  # MB
+    
+    billing:
+      base_cost_per_call: 1  # cent
+      quota:
+        free_tier: 100      # calls/day
+        builder_tier: 1000
+        mastermind_tier: 10000
+    
+    install:
+      size: "50KB"  # wrapper only
+      cache_ttl: 86400  # 24 hours
+    
+    auth:
+      type: jwt
+      audience: "tools.summon-ai.com"
+      issuer: "summon-academy-factory.shape02174.workers.dev"
+    
+    examples:
+      - action: get_quote
+        input: { symbol: "AAPL" }
+        output:
+          symbol: "AAPL"
+          price: 178.50
+          change: 2.3
+          change_percent: 1.31
+
+  # SEC Filings
+  sec_filings:
+    name: sec_filings
+    layer: cf_hosted
+    owner: summon
+    
+    versions:
+      - version: "1.0.0"
+        status: stable
+    
+    current_version: "1.0.0"
+    
+    description: SEC EDGAR filings search and retrieval
+    category: finance
+    tags: [sec, edgar, filings, regulatory]
+    
+    endpoint: "https://tools.summon-ai.com/sec-filings"
+    manifest_url: "https://r2.summon-ai.com/tools/summon/sec-filings/{version}/tool.yaml"
+    
+    actions:
+      - name: search_filings
+        description: Search SEC filings by ticker and form type
+        
+      - name: get_filing
+        description: Retrieve specific filing content
+    
+    sandbox:
+      network:
+        allowlist:
+          - www.sec.gov
+          - edgar.sec.gov
+      
+      runtime:
+        max_execution_time: 60000
+        max_memory: 256
+    
+    billing:
+      base_cost_per_call: 2
+      quota:
+        free_tier: 50
+        builder_tier: 500
+        mastermind_tier: 5000
+    
+    auth:
+      type: jwt
+
+  # Web Scraper (Lightweight)
+  web_scrape:
+    name: web_scrape
+    layer: cf_hosted
+    owner: summon
+    
+    versions:
+      - version: "1.0.0"
+        status: beta
+    
+    current_version: "1.0.0"
+    
+    description: Lightweight web scraping with content extraction
+    category: web
+    tags: [scrape, extract, parse]
+    
+    endpoint: "https://tools.summon-ai.com/web-scrape"
+    
+    actions:
+      - name: extract_text
+        description: Extract readable text from URL
+        
+      - name: extract_structured
+        description: Extract structured data (tables, lists)
+    
+    sandbox:
+      network:
+        # No default allowlist - user must specify domains
+        allowlist: []
+      
+      runtime:
+        max_execution_time: 15000
+        max_memory: 64
+    
+    guardrails:
+      require_robots_txt: true
+      respect_rate_limits: true
+      blocked_content_types: [binary, executable]
+    
+    billing:
+      base_cost_per_call: 3
+      quota:
+        free_tier: 20
+        builder_tier: 200
+        mastermind_tier: 2000
+    
+    auth:
+      type: jwt
+
+  # Calculator (Safe Math)
+  calculator:
+    name: calculator
+    layer: cf_hosted
+    owner: summon
+    
+    versions:
+      - version: "1.0.0"
+        status: stable
+    
+    current_version: "1.0.0"
+    
+    description: Safe mathematical expression evaluation
+    category: utility
+    tags: [math, calculate, compute]
+    
+    endpoint: "https://tools.summon-ai.com/calculator"
+    
+    actions:
+      - name: evaluate
+        description: Evaluate mathematical expression
+    
+    sandbox:
+      network:
+        allowlist: []  # No network needed
+      
+      runtime:
+        max_execution_time: 5000
+        max_memory: 32
+    
+    billing:
+      base_cost_per_call: 0  # Free
+      quota:
+        free_tier: unlimited
+
+# ─────────────────────────────────────────────
+# Categories
+# ─────────────────────────────────────────────
+categories:
+  finance:
+    description: Financial data and market information
+    tools: [yfinance, sec_filings]
+    
+  web:
+    description: Web scraping and search
+    tools: [web_scrape]
+    
+  utility:
+    description: General utilities
+    tools: [calculator]
+
+# ─────────────────────────────────────────────
+# Discovery
+# ─────────────────────────────────────────────
+discovery:
+  # How to find tools
+  endpoints:
+    list_all: "https://r2.summon-ai.com/tools/index.json"
+    search: "https://api.summon-ai.com/tools/search?q={query}"
+    
+  # Tool verification
+  verification:
+    checksums: "https://r2.summon-ai.com/tools/{owner}/{name}/{version}/checksums.txt"
+    signatures: "https://r2.summon-ai.com/tools/{owner}/{name}/{version}/signature.asc"

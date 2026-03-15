@@ -248,7 +248,12 @@ async function tryResolveFromR2(
   options?: R2FetchOptions
 ): Promise<ResolvedRitual | null> {
   try {
-    const result = await fetchRitualFromR2(parsed, options);
+    const result = await fetchRitualFromR2(
+      parsed.owner,
+      parsed.name,
+      parsed.version,
+      options
+    );
     
     // Cache the result for future use
     const cacheVersion = parsed.version || result.metadata?.version || 'latest';
@@ -257,7 +262,7 @@ async function tryResolveFromR2(
     return {
       parsedRef: parsed,
       yaml: result.yaml,
-      ritual: result.ritual,
+      ritual: parseRitualYaml(result.yaml),
       source: 'r2',
       resolvedAt: Date.now(),
     };

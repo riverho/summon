@@ -1,0 +1,42 @@
+{
+  "version": "0.3.0",
+  "last_synced": "2026-03-13T10:28:05.428316+00:00",
+  "last_updated": "2026-03-13T10:28:05.428316+00:00",
+  "sync_history": [
+    {
+      "timestamp": "2026-03-11T13:56:10.659121+00:00",
+      "version": "1.0",
+      "description": "Updated !MAP.md with entity registry"
+    },
+    {
+      "timestamp": "2026-03-11T14:04:54.858943+00:00",
+      "version": "1.0",
+      "description": "Freshness check passed, finalize complete"
+    },
+    {
+      "timestamp": "2026-03-12T08:58:47.919883+00:00",
+      "version": "0.3.0",
+      "description": "Wrap-up sync via service_router"
+    },
+    {
+      "timestamp": "2026-03-12T09:38:54.307649+00:00",
+      "version": "0.3.0",
+      "description": "Wrap-up sync via service_router"
+    },
+    {
+      "timestamp": "2026-03-12T09:41:13.701556+00:00",
+      "version": "0.3.0",
+      "description": "Refresh state, clear stale flag"
+    },
+    {
+      "timestamp": "2026-03-13T08:48:28.202169+00:00",
+      "version": "0.3.0",
+      "description": "Wrap-up sync via service_router"
+    },
+    {
+      "timestamp": "2026-03-13T10:28:05.428316+00:00",
+      "version": "0.3.0",
+      "description": "Wrap-up sync via service_router"
+    }
+  ]
+}

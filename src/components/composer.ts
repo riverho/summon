@@ -23,8 +23,12 @@ function isPersonaRef(obj: unknown): obj is PersonaRef {
   return typeof obj === 'object' && obj !== null && '$ref' in obj;
 }
 
-function isSkillRef(obj: unknown): obj is SkillRef {
+function hasSkillRefKey(obj: unknown): obj is { $ref: unknown } {
   return typeof obj === 'object' && obj !== null && '$ref' in obj;
+}
+
+function isSkillRef(obj: unknown): obj is SkillRef {
+  return hasSkillRefKey(obj) && typeof obj.$ref === 'string' && obj.$ref.trim().length > 0;
 }
 
 /**
@@ -58,17 +62,23 @@ export function resolveSkills(
 
   for (const skill of compositionSkills) {
     if (isSkillRef(skill)) {
-      const ref = skill.$ref;
+      const ref = skill.$ref.trim();
       const resolvedSkill = registry.skills.get(ref);
       if (!resolvedSkill) {
         console.warn(`Skill reference not found: ${ref}`);
         continue;
       }
       resolved.push(resolvedSkill);
-    } else {
-      // Inline skill
-      resolved.push(skill as Skill);
+      continue;
     }
+
+    if (hasSkillRefKey(skill)) {
+      console.warn('Skipping invalid skill reference: $ref must be a non-empty string');
+      continue;
+    }
+
+    // Inline skill
+    resolved.push(skill as Skill);
   }
 
   return resolved;

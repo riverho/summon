@@ -63,7 +63,7 @@ export type PersonaOrRef = z.infer<typeof PersonaOrRefSchema>;
  * A skill reference (for composable skills)
  */
 export const SkillRefSchema = z.object({
-  $ref: z.string().describe('Reference to a skill by ID'),
+  $ref: z.string().trim().min(1, 'Skill reference cannot be empty').describe('Reference to a skill by ID'),
 });
 
 export type SkillRef = z.infer<typeof SkillRefSchema>;
@@ -75,7 +75,7 @@ export const SkillSchema = z.object({
   id: z.string().describe('Unique identifier for the skill'),
   name: z.string().optional(),
   capabilities: z.array(z.string()).describe('What this skill enables'),
-  requiredTools: z.array(z.string()).describe('Tools that must be bound for this skill'),
+  requiredTools: z.array(z.string()).default([]).describe('Tools that must be bound for this skill'),
   optionalTools: z.array(z.string()).optional(),
   triggerKeywords: z.array(z.string()).default([]),
   promptFragment: z.string().describe('Injected into system prompt when skill is active'),
@@ -86,7 +86,18 @@ export type Skill = z.infer<typeof SkillSchema>;
 /**
  * Union type for inline skill or skill reference
  */
-export const SkillOrRefSchema = z.union([SkillRefSchema, SkillSchema]);
+const InlineSkillSchema = SkillSchema.passthrough()
+  .superRefine((skill, ctx) => {
+    if ('$ref' in skill) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Inline skill definitions cannot include $ref',
+      });
+    }
+  })
+  .transform(skill => SkillSchema.parse(skill));
+
+export const SkillOrRefSchema = z.union([SkillRefSchema, InlineSkillSchema]);
 export type SkillOrRef = z.infer<typeof SkillOrRefSchema>;
 
 // ============================================================================

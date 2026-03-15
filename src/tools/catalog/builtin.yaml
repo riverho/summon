@@ -1,0 +1,251 @@
+# Built-in Tool Catalog v1.0
+# Ships with summon CLI - always available, no network required
+
+version: "1.0.0"
+updated_at: "2026-02-27"
+
+# ─────────────────────────────────────────────
+# Layer 1: Built-in Tools
+# ─────────────────────────────────────────────
+tools:
+  # Web Search
+  web_search:
+    name: web_search
+    layer: builtin
+    version: "1.0.0"
+    description: Search the web using Tavily API
+    long_description: |
+      Performs web searches using the Tavily search API.
+      Returns relevant search results with snippets and URLs.
+      Requires TAVILY_API_KEY environment variable.
+    
+    parameters:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          description: Search query string
+          minLength: 1
+          maxLength: 500
+        max_results:
+          type: integer
+          description: Maximum number of results to return
+          default: 5
+          minimum: 1
+          maximum: 20
+        include_domains:
+          type: array
+          items:
+            type: string
+          description: Restrict search to specific domains
+          optional: true
+    
+    returns:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              title: { type: string }
+              url: { type: string, format: uri }
+              content: { type: string }
+              score: { type: number }
+        query: { type: string }
+        total_results: { type: integer }
+    
+    implementation:
+      module: src/builtin/tools/web_search.js
+      class: WebSearchTool
+    
+    env_requirements:
+      - TAVILY_API_KEY
+    
+    rate_limits:
+      requests_per_minute: 100
+      
+    examples:
+      - input:
+          query: "latest AI developments 2026"
+          max_results: 3
+        output:
+          results:
+            - title: "AI Breakthrough in 2026"
+              url: "https://example.com/ai-2026"
+              content: "Recent advances in..."
+
+  # File Operations
+  file_read:
+    name: file_read
+    layer: builtin
+    version: "1.0.0"
+    description: Read contents of a file
+    
+    parameters:
+      type: object
+      required: [path]
+      properties:
+        path:
+          type: string
+          description: File path to read (relative or absolute)
+        encoding:
+          type: string
+          enum: [utf8, base64, binary]
+          default: utf8
+    
+    returns:
+      type: object
+      properties:
+        content: { type: string }
+        path: { type: string }
+        size: { type: integer }
+        modified: { type: string, format: date-time }
+    
+    implementation:
+      module: src/builtin/tools/file.js
+      function: readFile
+    
+    sandbox:
+      filesystem: read-only
+      allowed_paths: ["./", "~/"]
+      blocked_patterns: ["*.env", "*.key", "*secret*"]
+
+  file_write:
+    name: file_write
+    layer: builtin
+    version: "1.0.0"
+    description: Write content to a file
+    
+    parameters:
+      type: object
+      required: [path, content]
+      properties:
+        path:
+          type: string
+          description: File path to write
+        content:
+          type: string
+          description: Content to write
+        encoding:
+          type: string
+          enum: [utf8, base64]
+          default: utf8
+        append:
+          type: boolean
+          default: false
+    
+    returns:
+      type: object
+      properties:
+        success: { type: boolean }
+        path: { type: string }
+        bytes_written: { type: integer }
+    
+    implementation:
+      module: src/builtin/tools/file.js
+      function: writeFile
+    
+    sandbox:
+      filesystem: write
+      allowed_paths: ["./outputs/", "./data/", "~/Documents/Summon/"]
+      require_approval: true  # Ask before writing
+
+  # Git Operations
+  git_status:
+    name: git_status
+    layer: builtin
+    version: "1.0.0"
+    description: Get git repository status
+    
+    parameters:
+      type: object
+      properties:
+        path:
+          type: string
+          description: Path to git repository
+          default: "."
+    
+    returns:
+      type: object
+      properties:
+        branch: { type: string }
+        clean: { type: boolean }
+        modified: { type: array, items: { type: string } }
+        staged: { type: array, items: { type: string } }
+        untracked: { type: array, items: { type: string } }
+    
+    implementation:
+      module: src/builtin/tools/git.js
+      function: gitStatus
+    
+    sandbox:
+      subprocess: true
+      allowed_commands: ["git status", "git branch"]
+
+  # Directory Operations
+  list_directory:
+    name: list_directory
+    layer: builtin
+    version: "1.0.0"
+    description: List contents of a directory
+    
+    parameters:
+      type: object
+      properties:
+        path:
+          type: string
+          description: Directory path
+          default: "."
+        recursive:
+          type: boolean
+          default: false
+        pattern:
+          type: string
+          description: Glob pattern to filter files
+          optional: true
+    
+    returns:
+      type: object
+      properties:
+        path: { type: string }
+        entries:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              type: { type: string, enum: [file, directory] }
+              size: { type: integer }
+              modified: { type: string }
+    
+    implementation:
+      module: src/builtin/tools/directory.js
+      function: listDirectory
+
+# ─────────────────────────────────────────────
+# Tool Combinations (for convenience)
+# ─────────────────────────────────────────────
+combinations:
+  research:
+    description: "Full research suite"
+    tools: [web_search, file_read]
+    
+  development:
+    description: "Development toolkit"
+    tools: [file_read, file_write, git_status, list_directory]
+
+# ─────────────────────────────────────────────
+# Default Mappings
+# ─────────────────────────────────────────────
+defaults:
+  # If ritual doesn't specify, these are always available
+  always_include: []
+  
+  # Auto-include based on ritual persona keywords
+  auto_detect:
+    - keywords: [research, analyst, search]
+      tools: [web_search]
+    - keywords: [developer, coder, programmer]
+      tools: [file_read, file_write, git_status]

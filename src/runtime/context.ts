@@ -1,6 +1,7 @@
 import type { Ritual } from '../ritual/types.js';
 import type { ToolImplementation } from '../tools/resolver.js';
 import type { SteeringPreferences, ExecutionMode, ExecutionCheckpoint, CheckpointState } from '../gap-chat/steering.js';
+import type { AgentEvent } from '../components/types.js';
 
 /**
  * Execution trace entry - records a step in the execution
@@ -71,6 +72,8 @@ export interface ExecutionOptions {
   quiet?: boolean;
   /** Execution mode: autonomous (default), interactive, or review */
   mode?: ExecutionMode;
+  /** Progress callback for monitoring execution */
+  onProgress?: (event: AgentEvent) => void;
 }
 
 /**

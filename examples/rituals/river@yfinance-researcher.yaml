@@ -1,0 +1,195 @@
+# river@yfinance-researcher v1.0.0
+# First build test ritual for 3-layer tool system
+
+name: yfinance-researcher
+version: 1.0.0
+owner: river
+description: Stock research using Yahoo Finance and web search
+
+# ─────────────────────────────────────────────
+# PERSONA
+# ─────────────────────────────────────────────
+persona:
+  role: Financial Research Analyst
+  goal: Provide comprehensive stock analysis using market data and news
+  backstory: |
+    Seasoned equity analyst with 15+ years of experience.
+    Combines quantitative analysis (price data, fundamentals) with 
+    qualitative research (news, market sentiment) to provide 
+    balanced, data-driven insights.
+  
+  behavior:
+    style: professional
+    priorities:
+      - Data accuracy and source attribution
+      - Clear, actionable insights
+      - Risk awareness and caveats
+    avoidances:
+      - Speculation without supporting data
+      - Unsubstantiated claims
+      - Financial advice disguised as analysis
+    responseFormat:
+      useTables: true
+      maxLength: 2000
+  
+  # Tool usage guidance
+  tool_guidance:
+    yfinance.get_quote:
+      when: User asks for current stock price or basic metrics
+      priority: primary
+      examples: ["What's AAPL at?", "TSLA price"]
+    
+    yfinance.get_history:
+      when: User asks about price trends or charts
+      priority: primary
+      examples: ["AAPL 1 month chart", "How has TSLA performed?"]
+    
+    web_search:
+      when: User asks about news, events, or context
+      priority: secondary
+      examples: ["AAPL news today", "Why did TSLA drop?"]
+
+# ─────────────────────────────────────────────
+# SKILLS
+# ─────────────────────────────────────────────
+skills:
+  - $ref: finance
+    config:
+      focus: equity_research
+  - $ref: web-search
+    config:
+      max_results: 5
+
+# ─────────────────────────────────────────────
+# MODEL
+# ─────────────────────────────────────────────
+model:
+  primary: gpt-4o-mini
+  provider: openai
+  temperature: 0.3
+  maxIterations: 10
+
+# ─────────────────────────────────────────────
+# TOOL MANIFEST (3-Layer)
+# ─────────────────────────────────────────────
+manifest:
+  # Layer 1: Built-in (ships with summon)
+  builtin_tools:
+    - name: web_search
+      version: "*"  # Use latest
+      alias: search  # Call as 'search' in ritual
+  
+  # Layer 2: CF-hosted (fetched from R2, sandboxed)
+  cf_tools:
+    - name: yfinance
+      version: "^2.0.0"  # Semver range
+      alias: yf          # Call as 'yf.get_quote'
+  
+  # Layer 3: External (MCP, optional)
+  # external_tools: []  # None for this ritual
+
+# ─────────────────────────────────────────────
+# FUNCTION CALLING
+# ─────────────────────────────────────────────
+function_calling:
+  mode: auto  # auto | manual | hybrid
+  
+  # When to use which tools
+  strategy:
+    - condition: "query contains stock ticker AND asks for price"
+      tools: ["yf.get_quote"]
+      priority: high
+    
+    - condition: "query contains stock ticker AND mentions trend/chart/history"
+      tools: ["yf.get_history", "yf.get_quote"]
+      priority: high
+    
+    - condition: "query mentions news, events, earnings, or why price moved"
+      tools: ["search", "yf.get_quote"]
+      priority: medium
+    
+    - condition: "query asks for comparison between stocks"
+      tools: ["yf.get_quote", "yf.get_history"]
+      priority: high
+  
+  # Pre-defined tool chains
+  chains:
+    - name: full_stock_analysis
+      description: Complete analysis with price, history, and news
+      steps:
+        - tool: yf.get_quote
+          parameters:
+            symbol: "{{user.ticker}}"
+          output_as: quote
+          
+        - tool: yf.get_history
+          parameters:
+            symbol: "{{quote.symbol}}"
+            period: "1mo"
+          output_as: history
+          
+        - tool: search
+          parameters:
+            query: "{{quote.symbol}} stock news today"
+          output_as: news
+          
+        - tool: yf.get_history
+          parameters:
+            symbol: "{{quote.symbol}}"
+            period: "1y"
+            interval: "1d"
+          output_as: yearly_chart
+
+# ─────────────────────────────────────────────
+# GUARDRAILS
+# ─────────────────────────────────────────────
+guardrails:
+  maxResponseLength: 2000
+  
+  # Tool usage limits
+  tool_policy:
+    max_calls_per_run: 20
+    max_cost_per_run: 100  # cents
+    
+    require_approval: []  # All tools auto-approved for this ritual
+    
+    blocked_actions:
+      - yfinance.search  # Disable broad search (use web_search instead)
+  
+  # Content safety
+  content_policy:
+    blocked_topics:
+      - insider_trading
+      - market_manipulation
+      - pump_and_dump_schemes
+    
+    blocked_patterns:
+      - "guaranteed.*return"
+      - "get rich quick"
+  
+  # Training configuration (for Factory)
+  training:
+    sample_queries:
+      - "What's AAPL stock price?"
+      - "Analyze TSLA"
+      - "Compare NVDA and AMD"
+      - "Why did AMZN drop today?"
+      - "MSFT 1 month performance"
+    
+    evaluation_criteria:
+      - Must use yfinance for price data
+      - Must cite web_search sources
+      - Must include risk caveats
+      - Tables for comparisons
+
+# ─────────────────────────────────────────────
+# WORKFLOW
+# ─────────────────────────────────────────────
+workflow:
+  style: loose  # Allow agent flexibility
+  maxIterations: 10
+  timeoutMs: 60000
+  
+  thinking:
+    reflectionBeforeTool: true
+    reflectionBeforeAnswer: true

@@ -1,0 +1,15 @@
+{
+  "checked_at": "2026-03-13T10:28:04.669415+00:00",
+  "affected_entities": [
+    "E-SUMMON-CLI-01",
+    "E-SUMMON-ORCH-01",
+    "E-SUMMON-RUNTIME-01"
+  ],
+  "issues": [],
+  "verified": [
+    "Entity E-SUMMON-CLI-01: file_path 'src/cli/index.ts' exists",
+    "Entity E-SUMMON-ORCH-01: file_path 'src/orchestration/orchestrator.ts' exists",
+    "Entity E-SUMMON-RUNTIME-01: file_path 'src/runtime/' exists"
+  ],
+  "status": "PASS"
+}

@@ -162,6 +162,14 @@ export function loadAgentComposition(filepath: string): AgentComposition | null 
   }
 }
 
+function hasRefKey(value: unknown): value is { $ref: unknown } {
+  return typeof value === 'object' && value !== null && '$ref' in value;
+}
+
+function hasNonEmptyRef(value: unknown): value is { $ref: string } {
+  return hasRefKey(value) && typeof value.$ref === 'string' && value.$ref.trim().length > 0;
+}
+
 export function validateComposition(composition: AgentComposition, registry: ComponentRegistry): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
@@ -189,21 +197,26 @@ export function validateComposition(composition: AgentComposition, registry: Com
   if (composition.skills && composition.skills.length > 0) {
     for (let i = 0; i < composition.skills.length; i++) {
       const skill = composition.skills[i];
-      if (skill && '$ref' in skill && skill.$ref) {
-        // It's a skill reference
-        const ref = skill.$ref;
+
+      if (hasNonEmptyRef(skill)) {
+        const ref = skill.$ref.trim();
         const foundSkill = registry.skills.get(ref);
         if (!foundSkill) {
           errors.push(`Skill reference not found at index ${i}: '$ref: ${ref}'`);
           errors.push(`  Suggestion: Install with 'summon install skill ${ref}' or check available skills with 'summon skills list'`);
         }
-      } else {
-        // Validate inline skill
-        try {
-          SkillSchema.parse(skill);
-        } catch (e) {
-          errors.push(`Invalid skill at index ${i}: ${e instanceof Error ? e.message : String(e)}`);
-        }
+        continue;
+      }
+
+      if (hasRefKey(skill)) {
+        errors.push(`Invalid skill reference at index ${i}: '$ref' must be a non-empty string`);
+        continue;
+      }
+
+      try {
+        SkillSchema.parse(skill);
+      } catch (e) {
+        errors.push(`Invalid skill at index ${i}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
   }

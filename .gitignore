@@ -3,3 +3,4 @@ node_modules
 .DS_Store
 .summon_mem/
 *.swp
+src/cli/index.ts

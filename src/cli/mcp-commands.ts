@@ -1,16 +1,22 @@
+/**
+ * MCP Commands - Full Model Context Protocol CLI
+ * 
+ * Full spec support: stdio, HTTP/SSE transports
+ * Tools, Resources, Prompts capabilities
+ */
+
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import yaml from 'js-yaml';
-import { mcpRegistry } from '../runtime/mcp-client.js';
+import { 
+  getMCPManager, 
+  initializeMCPTools,
+} from '../mcp/resolver.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = path.join(__dirname, '..', 'builtin', 'mcp', 'mcp-servers.yaml');
-
-// ============================================================================
-// MCP Commands
-// ============================================================================
+const USER_CONFIG_PATH = path.join(process.env.HOME || '~', '.summon', 'config', 'mcp-servers.yaml');
 
 export function createMCPCommands(): Command {
   const mcp = new Command('mcp')
@@ -20,125 +26,42 @@ export function createMCPCommands(): Command {
   mcp
     .command('list')
     .description('List all configured MCP servers')
-    .action(() => {
-      const status = mcpRegistry.listStatus();
+    .action(async () => {
+      await initializeMCPTools();
+      const manager = getMCPManager();
+      const status = manager.getStatus();
+      
       if (status.length === 0) {
-        console.log('No MCP servers configured.');
-        console.log('Add servers to:', CONFIG_PATH);
+        console.log('No MCP servers connected.');
+        console.log('Use "summon mcp add" to configure servers.');
         return;
       }
 
       console.log('MCP Servers:\n');
       for (const s of status) {
-        const statusIcon = s.running ? '🟢' : '🔴';
-        const enabledIcon = s.enabled ? '✅' : '❌';
-        console.log(`  ${statusIcon} ${enabledIcon} ${s.name}`);
-        if (s.running && s.pid) {
-          console.log(`      PID: ${s.pid}`);
-        }
-        if (s.tools.length > 0) {
-          console.log(`      Tools: ${s.tools.join(', ')}`);
-        }
-      }
-    });
-
-  // Show status of all MCP servers
-  mcp
-    .command('status')
-    .description('Show detailed status of all MCP servers')
-    .action(() => {
-      const status = mcpRegistry.listStatus();
-      console.log(JSON.stringify(status, null, 2));
-    });
-
-  // Start an MCP server
-  mcp
-    .command('start <name>')
-    .description('Start an MCP server by name')
-    .action(async (name: string) => {
-      console.log(`Starting MCP server: ${name}...`);
-      const success = await mcpRegistry.start(name);
-      if (success) {
-        console.log(`✅ MCP server ${name} started successfully`);
-      } else {
-        console.log(`❌ Failed to start MCP server ${name}`);
-        process.exit(1);
-      }
-    });
-
-  // Stop an MCP server
-  mcp
-    .command('stop <name>')
-    .description('Stop an MCP server by name')
-    .action(async (name: string) => {
-      console.log(`Stopping MCP server: ${name}...`);
-      const success = await mcpRegistry.stop(name);
-      if (success) {
-        console.log(`✅ MCP server ${name} stopped`);
-      } else {
-        console.log(`❌ Failed to stop MCP server ${name}`);
-        process.exit(1);
-      }
-    });
-
-  // Restart an MCP server
-  mcp
-    .command('restart <name>')
-    .description('Restart an MCP server by name')
-    .action(async (name: string) => {
-      console.log(`Restarting MCP server: ${name}...`);
-      const success = await mcpRegistry.restart(name);
-      if (success) {
-        console.log(`✅ MCP server ${name} restarted`);
-      } else {
-        console.log(`❌ Failed to restart MCP server ${name}`);
-        process.exit(1);
-      }
-    });
-
-  // Show available tools from MCP servers
-  mcp
-    .command('tools [name]')
-    .description('Show available tools from all or specific MCP server')
-    .action(async (name?: string) => {
-      if (name) {
-        const client = mcpRegistry.getClient(name);
-        if (!client) {
-          console.log(`MCP server ${name} is not running`);
-          return;
-        }
-        const tools = await client.listTools();
-        console.log(`Tools from ${name}:`);
-        for (const tool of tools) {
-          console.log(`  - ${tool.name}: ${tool.description || 'No description'}`);
-        }
-      } else {
-        const status = mcpRegistry.listStatus();
-        for (const s of status) {
-          if (s.running) {
-            console.log(`\n${s.name}:`);
-            const client = mcpRegistry.getClient(s.name);
-            if (client) {
-              const tools = await client.listTools();
-              for (const tool of tools) {
-                console.log(`  - ${tool.name}: ${tool.description || 'No description'}`);
-              }
-            }
-          }
-        }
+        const statusIcon = s.connected ? '🟢' : '🔴';
+        const caps = Object.entries(s.capabilities)
+          .filter(([, v]) => v)
+          .map(([k]) => k)
+          .join(', ');
+        console.log(`  ${statusIcon} ${s.server}`);
+        console.log(`      Capabilities: ${caps || 'none'}`);
       }
     });
 
   // Connect to an MCP server
   mcp
     .command('connect <name>')
-    .description('Connect to an MCP server')
+    .description('Connect to an MCP server by name')
     .action(async (name: string) => {
-      const success = await mcpRegistry.start(name);
-      if (success) {
-        console.log(`✅ Connected to ${name}`);
-      } else {
-        console.log(`❌ Failed to connect to ${name}`);
+      const manager = getMCPManager();
+      await manager.loadConfig();
+      
+      try {
+        await manager.connect(name);
+        console.log(`✅ Connected to MCP server: ${name}`);
+      } catch (error) {
+        console.error(`❌ Failed to connect to ${name}:`, error);
         process.exit(1);
       }
     });
@@ -148,162 +71,200 @@ export function createMCPCommands(): Command {
     .command('disconnect <name>')
     .description('Disconnect from an MCP server')
     .action(async (name: string) => {
-      const success = await mcpRegistry.stop(name);
-      if (success) {
-        console.log(`✅ Disconnected from ${name}`);
-      } else {
-        console.log(`❌ Failed to disconnect from ${name}`);
+      const manager = getMCPManager();
+      
+      try {
+        await manager.disconnect(name);
+        console.log(`✅ Disconnected from MCP server: ${name}`);
+      } catch (error) {
+        console.error(`❌ Failed to disconnect from ${name}:`, error);
         process.exit(1);
       }
     });
 
-  // Add a new MCP server configuration
+  // Show available tools
   mcp
-    .command('add <name> <command>')
-    .description('Add a new MCP server configuration')
-    .action((name: string, command: string) => {
-      const configPath = CONFIG_PATH;
-      let config: { mcpServers: Array<{
-        name: string;
-        command: string;
-        args: string[];
-        env?: Record<string, string>;
-        enabled: boolean;
-      }> };
-
-      try {
-        const content = fs.readFileSync(configPath, 'utf-8');
-        config = yaml.load(content) as { mcpServers: Array<{
-          name: string;
-          command: string;
-          args: string[];
-          env?: Record<string, string>;
-          enabled: boolean;
-        }> };
-      } catch {
-        config = { mcpServers: [] };
+    .command('tools')
+    .description('Show available tools from MCP servers')
+    .action(async () => {
+      await initializeMCPTools();
+      const manager = getMCPManager();
+      
+      const tools = await manager.listAllTools();
+      
+      console.log('MCP Tools:\n');
+      for (const tool of tools) {
+        console.log(`  • ${tool.name} (${tool.server})`);
+        const desc = tool.description.substring(0, 60);
+        console.log(`    ${desc}${tool.description.length > 60 ? '...' : ''}`);
       }
-
-      // Parse command and args
-      const parts = command.split(' ');
-      const cmd = parts[0];
-      const args = parts.slice(1);
-
-      config.mcpServers.push({
-        name,
-        command: cmd,
-        args,
-        enabled: true,
-      });
-
-      fs.writeFileSync(configPath, yaml.dump(config));
-      console.log(`✅ Added MCP server: ${name}`);
+      
+      console.log(`\nTotal: ${tools.length} tools`);
     });
 
-  // Remove an MCP server configuration
+  // Show available resources
+  mcp
+    .command('resources')
+    .description('Show available resources from MCP servers')
+    .action(async () => {
+      await initializeMCPTools();
+      const manager = getMCPManager();
+      
+      const resources = await manager.listAllResources();
+      
+      console.log('MCP Resources:\n');
+      for (const r of resources) {
+        console.log(`  • ${r.name} (${r.server})`);
+        console.log(`    URI: ${r.uri}`);
+      }
+    });
+
+  // Show available prompts
+  mcp
+    .command('prompts')
+    .description('Show available prompts from MCP servers')
+    .action(async () => {
+      await initializeMCPTools();
+      const manager = getMCPManager();
+      
+      const prompts = await manager.listAllPrompts();
+      
+      console.log('MCP Prompts:\n');
+      for (const p of prompts) {
+        console.log(`  • ${p.name} (${p.server})`);
+      }
+    });
+
+  // Add a new MCP server
+  mcp
+    .command('add')
+    .description('Add a new MCP server configuration')
+    .requiredOption('-n, --name <name>', 'Server name')
+    .option('-c, --command <cmd>', 'Command for stdio transport')
+    .option('-u, --url <url>', 'URL for HTTP/SSE transport')
+    .option('-a, --args <args>', 'Arguments (comma-separated)')
+    .option('-e, --env <env>', 'Environment vars (KEY=value,KEY2=value2)')
+    .action((options) => {
+      if (!options.command && !options.url) {
+        console.error('Error: Either --command (stdio) or --url (HTTP/SSE) is required');
+        process.exit(1);
+      }
+
+      let config: { mcpServers: Array<any> } = { mcpServers: [] };
+
+      try {
+        if (fs.existsSync(USER_CONFIG_PATH)) {
+          const content = fs.readFileSync(USER_CONFIG_PATH, 'utf-8');
+          config = yaml.load(content) as { mcpServers: Array<any> };
+        }
+      } catch {
+        // Start fresh
+      }
+
+      const serverConfig: any = {
+        name: options.name,
+        enabled: true,
+      };
+
+      if (options.url) {
+        serverConfig.url = options.url;
+      } else {
+        serverConfig.command = options.command;
+        serverConfig.args = options.args ? options.args.split(',') : [];
+      }
+
+      if (options.env) {
+        serverConfig.env = {};
+        options.env.split(',').forEach((pair: string) => {
+          const [key, value] = pair.split('=');
+          if (key && value) {
+            serverConfig.env[key] = value;
+          }
+        });
+      }
+
+      // Remove existing server with same name
+      config.mcpServers = config.mcpServers.filter((s: any) => s.name !== options.name);
+      config.mcpServers.push(serverConfig);
+
+      // Ensure directory exists
+      const dir = path.dirname(USER_CONFIG_PATH);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
+      fs.writeFileSync(USER_CONFIG_PATH, yaml.dump(config));
+      console.log(`✅ Added MCP server: ${options.name}`);
+      if (options.url) {
+        console.log(`   Transport: HTTP/SSE (${options.url})`);
+      } else {
+        console.log(`   Transport: stdio (${options.command})`);
+      }
+      console.log(`   Config: ${USER_CONFIG_PATH}`);
+    });
+
+  // Remove an MCP server
   mcp
     .command('remove <name>')
     .description('Remove an MCP server configuration')
     .action((name: string) => {
-      const configPath = CONFIG_PATH;
-      let config: { mcpServers: Array<{
-        name: string;
-        command: string;
-        args: string[];
-        env?: Record<string, string>;
-        enabled: boolean;
-      }> };
+      let config: { mcpServers: Array<any> } = { mcpServers: [] };
 
       try {
-        const content = fs.readFileSync(configPath, 'utf-8');
-        config = yaml.load(content) as { mcpServers: Array<{
-          name: string;
-          command: string;
-          args: string[];
-          env?: Record<string, string>;
-          enabled: boolean;
-        }> };
+        if (fs.existsSync(USER_CONFIG_PATH)) {
+          const content = fs.readFileSync(USER_CONFIG_PATH, 'utf-8');
+          config = yaml.load(content) as { mcpServers: Array<any> };
+        }
       } catch {
         console.log('No MCP config found');
         return;
       }
 
       const before = config.mcpServers.length;
-      config.mcpServers = config.mcpServers.filter(s => s.name !== name);
-      const after = config.mcpServers.length;
+      config.mcpServers = config.mcpServers.filter((s: any) => s.name !== name);
 
-      if (before === after) {
+      if (before === config.mcpServers.length) {
         console.log(`MCP server ${name} not found`);
         return;
       }
 
-      fs.writeFileSync(configPath, yaml.dump(config));
+      fs.writeFileSync(USER_CONFIG_PATH, yaml.dump(config));
       console.log(`✅ Removed MCP server: ${name}`);
     });
 
-  // Enable an MCP server
+  // Enable/disable servers
   mcp
     .command('enable <name>')
     .description('Enable an MCP server')
-    .action((name: string) => {
-      const configPath = CONFIG_PATH;
-      let config: { mcpServers: Array<{
-        name: string;
-        enabled: boolean;
-      }> };
+    .action((name: string) => toggleServer(name, true));
 
-      try {
-        const content = fs.readFileSync(configPath, 'utf-8');
-        config = yaml.load(content) as { mcpServers: Array<{
-          name: string;
-          enabled: boolean;
-        }> };
-      } catch {
-        console.log('No MCP config found');
-        return;
-      }
-
-      const server = config.mcpServers.find(s => s.name === name);
-      if (server) {
-        server.enabled = true;
-        fs.writeFileSync(configPath, yaml.dump(config));
-        console.log(`✅ Enabled MCP server: ${name}`);
-      } else {
-        console.log(`MCP server ${name} not found`);
-      }
-    });
-
-  // Disable an MCP server
   mcp
     .command('disable <name>')
     .description('Disable an MCP server')
-    .action((name: string) => {
-      const configPath = CONFIG_PATH;
-      let config: { mcpServers: Array<{
-        name: string;
-        enabled: boolean;
-      }> };
-
-      try {
-        const content = fs.readFileSync(configPath, 'utf-8');
-        config = yaml.load(content) as { mcpServers: Array<{
-          name: string;
-          enabled: boolean;
-        }> };
-      } catch {
-        console.log('No MCP config found');
-        return;
-      }
-
-      const server = config.mcpServers.find(s => s.name === name);
-      if (server) {
-        server.enabled = false;
-        fs.writeFileSync(configPath, yaml.dump(config));
-        console.log(`✅ Disabled MCP server: ${name}`);
-      } else {
-        console.log(`MCP server ${name} not found`);
-      }
-    });
+    .action((name: string) => toggleServer(name, false));
 
   return mcp;
+}
+
+function toggleServer(name: string, enabled: boolean): void {
+  let config: { mcpServers: Array<any> } = { mcpServers: [] };
+
+  try {
+    if (fs.existsSync(USER_CONFIG_PATH)) {
+      const content = fs.readFileSync(USER_CONFIG_PATH, 'utf-8');
+      config = yaml.load(content) as { mcpServers: Array<any> };
+    }
+  } catch {
+    console.log('No MCP config found');
+    return;
+  }
+
+  const server = config.mcpServers.find((s: any) => s.name === name);
+  if (server) {
+    server.enabled = enabled;
+    fs.writeFileSync(USER_CONFIG_PATH, yaml.dump(config));
+    console.log(`✅ ${enabled ? 'Enabled' : 'Disabled'} MCP server: ${name}`);
+  } else {
+    console.log(`MCP server ${name} not found`);
+  }
 }
